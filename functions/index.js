@@ -6,6 +6,8 @@ const functions = require('firebase-functions');
 const noderequest = require('request-promise');
 const databaseurl = "https://vml-mobi-first-thing.firebaseio.com/";
 
+const SSML_SPEAK_START = '<speak>';
+const SSML_SPEAK_END = '</speak>';
 
 
 exports.firstThing = functions.https.onRequest((request, response) => {
@@ -71,16 +73,21 @@ function readList (app) {
 		*/
 
 	    let taskListString = "";
+	    let taskListSpeech = SSML_SPEAK_START + 'Alright! here are your tasks ' + '<break time="1s" />';
 
 	    taskArray.forEach(function(task){
 			taskListString = taskListString + task + '  \n';
+			taskListSpeech = taskListSpeech + task + '<break time="1s" />';
 		});
 
+	    taskListSpeech = taskListSpeech + SSML_SPEAK_END;
+
 	    app.ask(app.buildRichResponse()
-	      .addSimpleResponse('Alright. Here are your tasks')
+	      .addSimpleResponse({ speech: taskListSpeech,
+        displayText: 'Alright! here are your tasks' })
 	      .addBasicCard(app.buildBasicCard(taskListString) // Note the two spaces before '\n' required for a
 	                            // line break to be rendered in the card
-	        .setTitle('List of tasks'))
+	      .setTitle('List of tasks'))
 	    );
 
     	return;
