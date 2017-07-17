@@ -51,6 +51,8 @@ function readList (app) {
 			let value = response[givenName][listName][task]['task'];
 			taskArray.push(value);
 		});
+		
+		/* 
 
 		const taskList = app.buildList('List of tasks');
 		let count = 1;
@@ -65,6 +67,22 @@ function readList (app) {
 			.addSimpleResponse("Alright. Here are your tasks"),
 			taskList
 			);
+
+		*/
+
+	    let taskListString = "";
+
+	    taskArray.forEach(function(task){
+			taskListString = taskListString + task + '  \n';
+		});
+
+	    app.ask(app.buildRichResponse()
+	      .addSimpleResponse('Alright. Here are your tasks')
+	      .addBasicCard(app.buildBasicCard(taskListString) // Note the two spaces before '\n' required for a
+	                            // line break to be rendered in the card
+	        .setTitle('List of tasks'))
+	    );
+
     	return;
 	  })
 	  .catch(function (err) {
