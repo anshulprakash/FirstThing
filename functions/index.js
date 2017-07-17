@@ -4,7 +4,8 @@ process.env.DEBUG = 'actions-on-google:*';
 const App = require('actions-on-google').ApiAiApp;
 const functions = require('firebase-functions');
 const noderequest = require('request-promise');
-const databaseurl = "https://vml-mobi-first-thing.firebaseio.com/";
+
+const DATABASE_URL = "https://vml-mobi-first-thing.firebaseio.com/";
 
 const SSML_SPEAK_START = '<speak>';
 const SSML_SPEAK_END = '</speak>';
@@ -32,7 +33,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		console.log(givenName);
 		console.log(listName);
 
-		//let uri = databaseurl + userId + '.json';
+		//let uri = DATABASE_URL + userId + '.json';
 		const options = {  
 		  method: 'GET',
 		  uri: "https://vml-mobi-first-thing.firebaseio.com/APhe68FJEPAHW8d9MpRdxOCluodn.json",
@@ -63,28 +64,36 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  	let tasks = Object.keys(response[givenName][listName]);
 		  	let taskArray = [];
 
-			tasks.forEach(function(task){
-				let value = response[givenName][listName][task]['task'];
-				taskArray.push(value);
-			});
+		  	if(!(tasks)){
+		  		tasks.forEach(function(task){
+					let value = response[givenName][listName][task]['task'];
+					taskArray.push(value);
+				});
+				
+			    let taskListString = "";
+			    let taskListSpeech = SSML_SPEAK_START + 'Alright! here are your tasks ' + '<break time="1s" />';
+
+			    taskArray.forEach(function(task){
+					taskListString = taskListString + task + '  \n';
+					taskListSpeech = taskListSpeech + task + '<break time="1s" />';
+				});
+
+			    taskListSpeech = taskListSpeech + SSML_SPEAK_END;
+
+			    app.ask(app.buildRichResponse()
+			      .addSimpleResponse({ speech: taskListSpeech,
+		        displayText: 'Alright! here are your tasks' })
+			      .addBasicCard(app.buildBasicCard(taskListString) // Note the two spaces before '\n' required for a
+			                            // line break to be rendered in the card
+			      .setTitle('List of tasks'))
+			    );
+			    return;
+			 }else{
+			 	app.tell({speech: 'There are no tasks currently for the list '+listName,
+			      		displayText: 'There are no tasks currently for the list '+listName});
+			    return;
+			 }
 			
-		    let taskListString = "";
-		    let taskListSpeech = SSML_SPEAK_START + 'Alright! here are your tasks ' + '<break time="1s" />';
-
-		    taskArray.forEach(function(task){
-				taskListString = taskListString + task + '  \n';
-				taskListSpeech = taskListSpeech + task + '<break time="1s" />';
-			});
-
-		    taskListSpeech = taskListSpeech + SSML_SPEAK_END;
-
-		    app.ask(app.buildRichResponse()
-		      .addSimpleResponse({ speech: taskListSpeech,
-	        displayText: 'Alright! here are your tasks' })
-		      .addBasicCard(app.buildBasicCard(taskListString) // Note the two spaces before '\n' required for a
-		                            // line break to be rendered in the card
-		      .setTitle('List of tasks'))
-		    );
 
 	    	return;
 		  })
@@ -95,7 +104,100 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	}
 
 	function createList (app) {
-		
+		let userId = app.getUser().userId;
+		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
+		let listName = app.getArgument(LIST_NAME).toLowerCase();
+
+		let getUri = DATABASE_URL + userId + '.json';
+		const getOptions = {  
+		  method: 'GET',
+		  uri: getUri,
+		  json: true
+		}
+
+		noderequest(getOptions)  
+		  .then(function (response) {
+		  	//If the userId is not in the database
+		  	if(response == null){
+		  		const putOptions ={
+		  			method: 'PUT',
+		  			uri: getUri,
+		  			json: {[givenName]: 
+		  					{[listName]: [
+            								"__empty_list"
+        								] 
+        					}
+        				}
+		  		}
+		  		noderequest(putOptions)  
+				.then(function (response) {
+					app.tell({speech: 'List created by the name '+listName+' for '+givenName,
+			      		displayText: 'List created by the name '+listName+' for '+givenName});
+			      		return;
+				})
+				.catch(function (err) {
+					console.log('Error while trying to retrieve data', err);
+				 });
+		  	}else{
+		  		let people = Object.keys(response);
+
+		  		//givenName does not have any list
+		  		if(people.indexOf(givenName) == -1){
+		  			console.log('givenName does not have any list');
+		  			let putUri = DATABASE_URL + userId + '/' + givenName +'.json';
+		  			const putOptions ={
+		  			method: 'PUT',
+		  			uri: putUri,
+		  			json: {[listName]: [
+            								"__empty_list"
+        								] 
+        				}
+		  			}
+		  			noderequest(putOptions)  
+				  	.then(function (response) {
+				  		app.tell({speech: 'List created by the name '+listName+' for '+givenName,
+			      		displayText: 'List created by the name '+listName+' for '+givenName});
+			      		return;
+					})
+				  	.catch(function (err) {
+				    	console.log('Error while trying to retrieve data', err);
+				  	});
+		  		}else{
+		  			let lists = Object.keys(response[givenName]);
+		  			//If there is already a list by the listName for givenName
+		  			if(lists.indexOf(listName) > -1){
+		  				console.log('list name already exits');
+				  		app.tell({speech: 'There is already list by the name '+listName+' for '+givenName,
+			      		displayText: 'There is already list by the name '+listName+' for '+givenName});
+			      		return;
+				  	}else{
+				  		console.log('Creating list for' + givenName);
+				  		let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'.json';
+			  			const putOptions ={
+				  			method: 'PUT',
+				  			uri: putUri,
+				  			json: ["__empty_list"]
+			  			}
+			  			noderequest(putOptions)  
+					  	.then(function (response) {
+					  		app.tell({speech: 'List created by the name '+listName+' for '+givenName,
+				      		displayText: 'List created by the name '+listName+' for '+givenName});
+				      		return;
+						})
+					  	.catch(function (err) {
+					    	console.log('Error while trying to retrieve data', err);
+					  	});
+				  	}
+		  		}
+
+		  	}
+		 })
+		  .catch(function (err) {
+		    console.log('Error while trying to retrieve data', err);
+		 });
+
+		 return; 
+
 	}
 
   	// Greet the user and direct them to next turn
