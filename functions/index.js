@@ -38,12 +38,18 @@ function readList (app) {
 
 	  	if(people.indexOf(givenName) == -1){
 	  		//givenName does not have any list
+	  		app.tell({speech: 'Sorry! There is no list for '+ givenName,
+      			displayText: 'Sorry! There is no list for '+ givenName});
+
+	  		return;
 	  	}
 	  	console.log(people)
 	  	let lists = Object.keys(response[givenName]);
 
 	  	if(lists.indexOf(listName) == -1){
-	  		//givenName does not have any list by the name listName
+	  		app.tell({speech: 'Sorry! There is no list by the name '+listName+' for '+givenName,
+      		displayText: 'Sorry! There is no list by the name '+listName+' for '+givenName});
+      		return;
 	  	}
 
 	  	let tasks = Object.keys(response[givenName][listName]);
@@ -54,24 +60,6 @@ function readList (app) {
 			taskArray.push(value);
 		});
 		
-		/* 
-
-		const taskList = app.buildList('List of tasks');
-		let count = 1;
-		taskArray.forEach(function(task){
-			taskList.addItems(app.buildOptionItem(task,['1', 'First one'])
-            .setTitle(task)
-            .setDescription(task))
-		});
-		console.log(taskList);
-
-	    app.askWithList(app.buildRichResponse()
-			.addSimpleResponse("Alright. Here are your tasks"),
-			taskList
-			);
-
-		*/
-
 	    let taskListString = "";
 	    let taskListSpeech = SSML_SPEAK_START + 'Alright! here are your tasks ' + '<break time="1s" />';
 
