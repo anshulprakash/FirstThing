@@ -166,8 +166,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  			//If there is already a list by the listName for givenName
 		  			if(lists.indexOf(listName) > -1){
 		  				console.log('list name already exits');
-				  		app.ask({speech: 'There is already list by the name '+listName+' for '+givenName,
-			      		displayText: 'There is already list by the name '+listName+' for '+givenName});
+				  		app.ask({speech: 'There is already a list by the name '+listName+' for '+givenName,
+			      		displayText: 'There is already a list by the name '+listName+' for '+givenName});
 			      		return;
 				  	}else{
 				  		console.log('Creating list for' + givenName);
@@ -295,6 +295,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  				console.log('add item to list');
 		  				let tasks = Object.keys(response[givenName][listName]);
 		  				let count = tasks.length;
+		  				let alreadyPresent = false;
 		  				tasks.forEach(function(task){
 							let value = response[givenName][listName][task]['task'];		
 							if(!value){
@@ -302,30 +303,35 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 								count = 0;
 							}
 							if(value===listItem){
-								app.ask({speech: listItem + ' is already there in '+listName,
-			      				displayText: listItem + ' is already there in '+listName});
-			      				return;
+								alreadyPresent = true;
 							}
 						});
-						let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'/'+ count.toString() +'.json';
-						console.log('PUT URL: '+putUri);
-			  			const putOptions ={
-				  			method: 'PUT',
-				  			uri: putUri,
-				  			json: {
-            						"recurring" : "no",
-            						"task" : listItem
-        						  }
-			  			}
-			  			noderequest(putOptions)  
-					  	.then(function (response) {
-					  		app.ask({speech: listItem+ ' added to '+listName,
-				      		displayText: listItem+ ' added to '+listName});
-				      		return;
-						})
-					  	.catch(function (err) {
-					    	console.log('Error while trying to retrieve data', err);
-					  	});
+		  				if(alreadyPresent){
+		  					app.ask({speech: listItem + ' is already there in '+listName,
+			      			displayText: listItem + ' is already there in '+listName});
+			      			console.log('value===listItem');
+			      			return;
+		  				}else{
+		  					let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'/'+ count.toString() +'.json';
+							console.log('PUT URL: '+putUri);
+				  			const putOptions ={
+					  			method: 'PUT',
+					  			uri: putUri,
+					  			json: {
+	            						"recurring" : "no",
+	            						"task" : listItem
+	        						  }
+				  			}
+				  			noderequest(putOptions)  
+						  	.then(function (response) {
+						  		app.ask({speech: listItem+ ' added to '+listName,
+					      		displayText: listItem+ ' added to '+listName});
+					      		return;
+							})
+							.catch(function (err) {
+					    		console.log('Error while trying to retrieve data', err);
+					  		});	
+		  				}
 		  			}
 		  		}
 		  	}
