@@ -26,6 +26,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	console.log('Request headers: ' + JSON.stringify(request.headers));
 	console.log('Request body: ' + JSON.stringify(request.body));
 
+	//gets tasks for a lists for a user
 	function readList (app) {
 		let userId = app.getUser().userId;
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
@@ -336,6 +337,55 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		return; 
 	}
 
+	function readListsForOwner (app) {
+		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
+		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
+		let getUri = DATABASE_URL + userId + '/' + givenName + '.json';
+		const getOptions = {  
+		  method: 'GET',
+		  uri: getUri,
+		  json: true
+		}
+		noderequest(getOptions)  
+	  	.then(function (response) {
+	  	
+	  	//If there are no lists for the user
+		 if(response == null){
+		 	app.ask({speech: 'There are currently no lists for you '+givenName,
+			      	displayText: 'There are currently no lists for you '+givenName});
+			return;
+		 }else{
+		 	let lists = Object.keys(response);
+		  	let listArray = [];
+
+	  		
+			
+		    let listString = "";
+		    let listSpeech = SSML_SPEAK_START + 'Alright! here are the lists ' + '<break time="0.5s" />';
+
+		    lists.forEach(function(list){
+				listString = listString + list + '  \n';
+				listSpeech = listSpeech + list + '<break time="0.5s" />';
+			});
+		    
+			listSpeech = listSpeech + SSML_SPEAK_END;
+			console.log('ListString '+listString);
+		    app.ask(app.buildRichResponse()
+		      .addSimpleResponse({ speech: listSpeech,
+	        displayText: 'Alright! here are the lists' })
+		      .addBasicCard(app.buildBasicCard(listString) // Note the two spaces before '\n' required for a
+		                            // line break to be rendered in the card
+		      .setTitle('Lists for '+givenName))
+		    );
+		    return;
+	  		}
+		 })
+	  	.catch(function (err) {
+	    	console.log('Error while trying to retrieve data', err);
+	  	});
+
+	}
+
   	// Greet the user and direct them to next turn
 	function unhandledDeepLinks (app) {
 	    if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
@@ -351,7 +401,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	actionMap.set(READ_LIST, readList);
 	actionMap.set(CREATE_LIST, createList);
 	actionMap.set(UNRECOGNIZED_DEEP_LINK, unhandledDeepLinks);
-	actionMap.set('add.task', addItemToList);
+	actionMap.set('add.task',addItemToList);
+	actionMap.set('fetch.lists',readListsForOwner);
 
 	app.handleRequest(actionMap);
 
