@@ -21,6 +21,9 @@ const LIST_NAME = 'list_name';
 const LIST_ITEM = 'list_items';
 const RECURRING_VALUE = 'recurring_value';
 
+//API.AI contexts
+const GUIDED_TOUR = 'guided-tour';
+
 exports.firstThing = functions.https.onRequest((request, response) => {
 
 	const app = new App({ request, response });
@@ -208,6 +211,13 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		let listItem = app.getArgument(LIST_ITEM).toLowerCase();
 		let recurringValue = app.getArgument(RECURRING_VALUE);
 
+		let itemAddedMsg = listItem+ ' added to the '+listName+' list';
+		let itemAddedMsgGuided = 'Perfect! To read this list you can say \'OK Google, ask FirstThing what\'s on '+ givenName+ '\'s '+listName+' list?';
+
+		let isGuidedTour = app.getContext(GUIDED_TOUR) ? true : false;
+		console.log('isGuidedTour'+isGuidedTour);
+		app.setContext(GUIDED_TOUR,0);
+
 		recurringValue = recurringValue ? recurringValue.toLowerCase() : "no";
 		console.log('recurring_value= '+recurringValue);
 
@@ -238,9 +248,12 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  		}
 		  		noderequest(putOptions)  
 				.then(function (response) {
-					app.ask({speech: listItem+ ' added to '+listName,
-			      		displayText: listItem+ ' added to '+listName});
-			      		return;
+					if(isGuidedTour){
+						app.ask({speech: itemAddedMsgGuided, displayText: itemAddedMsgGuided});
+					}else{
+						app.ask({speech: itemAddedMsg, displayText: itemAddedMsg});
+					}
+			      	return;
 				})
 				.catch(function (err) {
 					console.log('Error while trying to retrieve data', err);
@@ -264,8 +277,11 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  			}
 		  			noderequest(putOptions)  
 				  	.then(function (response) {
-				  		app.ask({speech: listItem+ ' added to '+listName,
-			      		displayText: listItem+ ' added to '+listName});
+				  		if(isGuidedTour){
+							app.ask({speech: itemAddedMsgGuided, displayText: itemAddedMsgGuided});
+						}else{
+							app.ask({speech: itemAddedMsg, displayText: itemAddedMsg});
+						}
 			      		return;
 					})
 				  	.catch(function (err) {
@@ -288,8 +304,11 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			  			}
 			  			noderequest(putOptions)  
 					  	.then(function (response) {
-					  		app.ask({speech: listItem+ ' added to '+listName,
-				      		displayText: listItem+ ' added to '+listName});
+					  		if(isGuidedTour){
+								app.ask({speech: itemAddedMsgGuided, displayText: itemAddedMsgGuided});
+							}else{
+								app.ask({speech: itemAddedMsg, displayText: itemAddedMsg});
+							}
 				      		return;
 						})
 					  	.catch(function (err) {
@@ -329,9 +348,11 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				  			}
 				  			noderequest(putOptions)  
 						  	.then(function (response) {
-						  		app.ask({speech: listItem+ ' added to '+listName,
-					      		displayText: listItem+ ' added to '+listName});
-					      		return;
+						  		if(isGuidedTour){
+									app.ask({speech: itemAddedMsgGuided, displayText: itemAddedMsgGuided});
+								}else{
+									app.ask({speech: itemAddedMsg, displayText: itemAddedMsg});
+								}
 							})
 							.catch(function (err) {
 					    		console.log('Error while trying to retrieve data', err);
