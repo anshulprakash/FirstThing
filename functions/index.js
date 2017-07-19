@@ -19,6 +19,7 @@ const CREATE_LIST = 'create.list';
 const GIVEN_NAME = 'given-name';
 const LIST_NAME = 'list_name';
 const LIST_ITEM = 'list_items';
+const RECURRING_VALUE = 'recurring_value';
 
 exports.firstThing = functions.https.onRequest((request, response) => {
 
@@ -205,6 +206,10 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
 		let listItem = app.getArgument(LIST_ITEM).toLowerCase();
+		let recurringValue = app.getArgument(RECURRING_VALUE);
+
+		recurringValue = recurringValue ? recurringValue.toLowerCase() : "no";
+		console.log('recurring_value= '+recurringValue);
 
 		let getUri = DATABASE_URL + userId + '.json';
 		const getOptions = {  
@@ -225,7 +230,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  			uri: getUri,
 		  			json: {[givenName]: 
 		  					{[listName]: [{
-            								"recurring" : "no",
+            								"recurring" : recurringValue,
             								"task" : listItem
         								 }] 
         					}
@@ -252,7 +257,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  			uri: putUri,
 		  			json: {[listName]:
             							[{
-            								"recurring" : "no",
+            								"recurring" : recurringValue,
             								"task" : listItem
         								}]
         				}
@@ -277,7 +282,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				  			method: 'PUT',
 				  			uri: putUri,
 				  			json: [{
-            								"recurring" : "no",
+            								"recurring" : recurringValue,
             								"task" : listItem
         							}]
 			  			}
@@ -318,7 +323,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 					  			method: 'PUT',
 					  			uri: putUri,
 					  			json: {
-	            						"recurring" : "no",
+	            						"recurring" : recurringValue,
 	            						"task" : listItem
 	        						  }
 				  			}
