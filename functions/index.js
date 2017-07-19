@@ -4,6 +4,7 @@ process.env.DEBUG = 'actions-on-google:*';
 const App = require('actions-on-google').ApiAiApp;
 const functions = require('firebase-functions');
 const noderequest = require('request-promise');
+const twilio = require('twilio');
 
 const DATABASE_URL = "https://vml-mobi-first-thing.firebaseio.com/";
 
@@ -14,16 +15,27 @@ const SSML_SPEAK_END = '</speak>';
 const UNRECOGNIZED_DEEP_LINK = 'deeplink.unknown';
 const READ_LIST = 'read.list';
 const CREATE_LIST = 'create.list';
+const ADD_TASK = 'add.task';
+const FETCH_LISTS = 'fetch.lists';
+const ADD_PHONENUMBER = 'add.phonenumber';
+const INPUT_WELCOME = 'input.welcome';
+const STOP_NOTIFICATION = 'stop.notification';
 
 // API.AI parameter names
 const GIVEN_NAME = 'given-name';
 const LIST_NAME = 'list_name';
 const LIST_ITEM = 'list_items';
 const RECURRING_VALUE = 'recurring_value';
+const PHONE_NUMBER = 'phone_number';
 
 //API.AI contexts
 const GUIDED_TOUR = 'guided-tour';
 
+// Twilio Credentials
+const accountSid = 'ACa280ebee55197ee9778f56bad859e768';
+const authToken = '11a1b1dd4549e9482aa369506767da06';
+
+//creates title case for functions
 function toTitleCase(str)
 {
     return str.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
@@ -35,11 +47,34 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	console.log('Request headers: ' + JSON.stringify(request.headers));
 	console.log('Request body: ' + JSON.stringify(request.body));
 
+	function addPhoneNumber (app) {
+		let userId = app.getUser().userId;
+		let phoneNumber = app.getArgument(PHONE_NUMBER);
+
+		console.log('phoneNumber: '+phoneNumber);
+		let successMsg = 'Got it. I\'ll send you a text when your users have arrived and started their lists. You can cancel this at any time by telling me to stop notifications. Ready to start a guided tour?';
+
+		app.ask({speech: successMsg,
+			     displayText: successMsg});
+		
+		return;
+	}
+
+	function welcome (app) {
+		console.log('inside welcome');
+		let message = 'Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start?';
+		
+		app.ask({speech: message,
+			     displayText: message});
+		return;
+	}
+
 	//gets tasks for a lists for a user
 	function readList (app) {
 		let userId = app.getUser().userId;
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
+		let sendNotification = false;
 		console.log(userId);
 		console.log(givenName);
 		console.log(listName);
@@ -94,14 +129,30 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				taskListSpeech = taskListSpeech + task + '<break time="0.5s" />';
 			});
 			taskListSpeech = taskListSpeech + SSML_SPEAK_END;
-			console.log('debugggg '+taskListString)
+			console.log('debugggg '+taskListString);
 		    app.ask(app.buildRichResponse()
-		      .addSimpleResponse({ speech: taskListSpeech,
-	        displayText: 'Alright! here are the tasks for '+toTitleCase(givenName) })
-		      .addBasicCard(app.buildBasicCard(taskListString) // Note the two spaces before '\n' required for a
-		                            // line break to be rendered in the card
-		      .setTitle('List of tasks for '+toTitleCase(givenName)))
+		       .addSimpleResponse({ speech: taskListSpeech, displayText: 'Alright! here are the tasks for '+toTitleCase(givenName) })
+		       .addBasicCard(app.buildBasicCard(taskListString) 
+		       .setTitle('List of tasks for '+toTitleCase(givenName)))
 		    );
+		    
+		    /*
+				TODO: fetch the notification flag and phone number
+		    */
+		    if(sendNotification){
+		    	let client = twilio(accountSid, authToken);
+			    client.messages
+				  .create({
+				    to: '+17146750966',
+				    from: '+18163071770',
+				    body: toTitleCase(givenName)+'\'s ' + listName +' has been accessed',
+				  })
+				  .then((message) => console.log(message.sid))
+				  .catch(function (err) {
+						console.log(err);
+				  });
+		    }
+		    
 		    return;
 		  })
 		  .catch(function (err) {
@@ -432,6 +483,15 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 
 	}
 
+	function stopNotification(app){
+		let userId = app.getUser().userId;
+
+		let successMsg = 'Okay! You have opted out of notifications.';
+		
+		app.ask({speech: successMsg, displayText: successMsg});
+		return;
+	}
+
   	// Greet the user and direct them to next turn
 	function unhandledDeepLinks (app) {
 	    if (app.hasSurfaceCapability(app.SurfaceCapabilities.SCREEN_OUTPUT)) {
@@ -447,8 +507,11 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	actionMap.set(READ_LIST, readList);
 	actionMap.set(CREATE_LIST, createList);
 	actionMap.set(UNRECOGNIZED_DEEP_LINK, unhandledDeepLinks);
-	actionMap.set('add.task',addItemToList);
-	actionMap.set('fetch.lists',readListsForOwner);
+	actionMap.set(ADD_TASK,addItemToList);
+	actionMap.set(FETCH_LISTS,readListsForOwner);
+	actionMap.set(ADD_PHONENUMBER,addPhoneNumber);
+	actionMap.set(INPUT_WELCOME, welcome);
+	actionMap.set(STOP_NOTIFICATION, stopNotifications);
 
 	app.handleRequest(actionMap);
 
