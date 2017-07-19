@@ -24,6 +24,11 @@ const RECURRING_VALUE = 'recurring_value';
 //API.AI contexts
 const GUIDED_TOUR = 'guided-tour';
 
+function toTitleCase(str)
+{
+    return str.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+}
+
 exports.firstThing = functions.https.onRequest((request, response) => {
 
 	const app = new App({ request, response });
@@ -54,7 +59,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  	if(people.indexOf(givenName) == -1){
 		  		//givenName does not have any list
 		  		app.ask({speech: 'Sorry! There is no list for '+ givenName,
-	      			displayText: 'Sorry! There is no list for '+ givenName});
+	      			displayText: 'Sorry! There is no list for '+ toTitleCase(givenName)});
 
 		  		return;
 		  	}
@@ -62,8 +67,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  	let lists = Object.keys(response[givenName]);
 
 		  	if(lists.indexOf(listName) == -1){
-		  		app.ask({speech: 'Sorry! There is no list by the name '+listName+' for '+givenName,
-	      		displayText: 'Sorry! There is no list by the name '+listName+' for '+givenName});
+		  		app.ask({speech: 'Sorry! There is no list by the name '+listName+' for '+ givenName ,
+	      		displayText: 'Sorry! There is no list by the name '+listName+' for '+ toTitleCase(givenName)});
 	      		return;
 		  	}
 
@@ -74,15 +79,15 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				let value = response[givenName][listName][task]['task'];
 				//If list is empty
 				if(!value){
-					app.ask({speech: 'There are no tasks currently for the list '+listName,
-			      		displayText: 'There are no tasks currently for the list '+listName});
+					app.ask({speech: 'There are no tasks currently for '+givenName+'\'s '+listName+' list',
+			      		displayText: 'There are no tasks currently for '+toTitleCase(givenName)+'\'s '+listName+' list'});
 			    	return;
 				}
 				taskArray.push(value);
 			});
 			
 		    let taskListString = "";
-		    let taskListSpeech = SSML_SPEAK_START + 'Alright! here are the tasks ' + '<break time="0.5s" />';
+		    let taskListSpeech = SSML_SPEAK_START + 'Alright! here are the tasks for '+givenName+ '<break time="0.5s" />';
 
 		    taskArray.forEach(function(task){
 				taskListString = taskListString + task + '  \n';
@@ -92,10 +97,10 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			console.log('debugggg '+taskListString)
 		    app.ask(app.buildRichResponse()
 		      .addSimpleResponse({ speech: taskListSpeech,
-	        displayText: 'Alright! here are the tasks' })
+	        displayText: 'Alright! here are the tasks for '+toTitleCase(givenName) })
 		      .addBasicCard(app.buildBasicCard(taskListString) // Note the two spaces before '\n' required for a
 		                            // line break to be rendered in the card
-		      .setTitle('List of tasks'))
+		      .setTitle('List of tasks for '+toTitleCase(givenName)))
 		    );
 		    return;
 		  })
@@ -110,6 +115,11 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
+
+		let createListSuccessTxt = 'List created by the name \''+listName+'\' for '+toTitleCase(givenName);
+		let createListSuccessSpeech = 'List created by the name '+listName+' for '+givenName;
+		let errorMsg = 'There is already a list by the name \''+listName+'\' for '+toTitleCase(givenName);
+		let errorSpeech = 'There is already a list by the name '+listName+' for '+givenName;
 
 		let getUri = DATABASE_URL + userId + '.json';
 		const getOptions = {  
@@ -134,8 +144,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  		}
 		  		noderequest(putOptions)  
 				.then(function (response) {
-					app.ask({speech: 'List created by the name '+listName+' for '+givenName,
-			      		displayText: 'List created by the name '+listName+' for '+givenName});
+					app.ask({speech: createListSuccessSpeech,
+			      		displayText: createListSuccessTxt});
 			      		return;
 				})
 				.catch(function (err) {
@@ -158,8 +168,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  			}
 		  			noderequest(putOptions)  
 				  	.then(function (response) {
-				  		app.ask({speech: 'List created by the name '+listName+' for '+givenName,
-			      		displayText: 'List created by the name '+listName+' for '+givenName});
+				  		app.ask({speech: createListSuccessSpeech,
+			      		displayText: createListSuccessTxt});
 			      		return;
 					})
 				  	.catch(function (err) {
@@ -170,8 +180,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  			//If there is already a list by the listName for givenName
 		  			if(lists.indexOf(listName) > -1){
 		  				console.log('list name already exits');
-				  		app.ask({speech: 'There is already a list by the name '+listName+' for '+givenName,
-			      		displayText: 'There is already a list by the name '+listName+' for '+givenName});
+				  		app.ask({speech: errorSpeech,
+			      		displayText: errorMsg});
 			      		return;
 				  	}else{
 				  		console.log('Creating list for' + givenName);
@@ -183,8 +193,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			  			}
 			  			noderequest(putOptions)  
 					  	.then(function (response) {
-					  		app.ask({speech: 'List created by the name '+listName+' for '+givenName,
-				      		displayText: 'List created by the name '+listName+' for '+givenName});
+					  		app.ask({speech: createListSuccessSpeech,
+				      		displayText: createListSuccessTxt});
 				      		return;
 						})
 					  	.catch(function (err) {
@@ -211,15 +221,19 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		let listItem = app.getArgument(LIST_ITEM).toLowerCase();
 		let recurringValue = app.getArgument(RECURRING_VALUE);
 
-		let itemAddedMsg = listItem+ ' added to the '+listName+' list';
-		let itemAddedMsgGuided = 'Perfect! To read this list you can say \'OK Google, ask FirstThing what\'s on '+ givenName+ '\'s '+listName+' list?';
-
-		let isGuidedTour = app.getContext(GUIDED_TOUR) ? true : false;
-		console.log('isGuidedTour'+isGuidedTour);
-		app.setContext(GUIDED_TOUR,0);
-
 		recurringValue = recurringValue ? recurringValue.toLowerCase() : "no";
 		console.log('recurring_value= '+recurringValue);
+
+		let itemAddedMsg = recurringValue == "no" ? 'Got it. \''+listItem+ '\' added to '+toTitleCase(givenName)+'\'s '+listName+' list' : 'Got it. \''+listItem+'\' will repeat '+recurringValue+' for '+toTitleCase(givenName);
+		let itemAddedMsgGuided = 'Perfect! To read this list you can say \'OK Google, ask FirstThing what\'s on '+ toTitleCase(givenName)+ '\'s '+listName+' list?';
+		let addItemToListError = '\''+listItem +'\''+ ' is already there in '+toTitleCase(givenName)+'\'s '+ listName +' list';
+		
+		let isGuidedTour = app.getContext(GUIDED_TOUR) ? true : false;
+		console.log('isGuidedTour'+isGuidedTour);
+		//remove the guided tour context
+		app.setContext(GUIDED_TOUR,0);
+
+		
 
 		let getUri = DATABASE_URL + userId + '.json';
 		const getOptions = {  
@@ -331,8 +345,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 							}
 						});
 		  				if(alreadyPresent){
-		  					app.ask({speech: listItem + ' is already there in '+listName,
-			      			displayText: listItem + ' is already there in '+listName});
+		  					app.ask({speech: addItemToListError,
+			      			displayText: addItemToListError});
 			      			console.log('value===listItem');
 			      			return;
 		  				}else{
@@ -383,8 +397,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	  	
 	  	//If there are no lists for the user
 		 if(response == null){
-		 	app.ask({speech: 'There are currently no lists for you '+givenName,
-			      	displayText: 'There are currently no lists for you '+givenName});
+		 	app.ask({speech: 'There are currently no lists for '+givenName,
+			      	displayText: 'There are currently no lists for '+toTitleCase(givenName)});
 			return;
 		 }else{
 		 	let lists = Object.keys(response);
@@ -393,7 +407,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	  		
 			
 		    let listString = "";
-		    let listSpeech = SSML_SPEAK_START + 'Alright! here are the lists ' + '<break time="0.5s" />';
+		    let listSpeech = SSML_SPEAK_START + 'Alright! here are the lists for ' + givenName + '<break time="0.5s" />';
 
 		    lists.forEach(function(list){
 				listString = listString + list + '  \n';
@@ -404,10 +418,10 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			console.log('ListString '+listString);
 		    app.ask(app.buildRichResponse()
 		      .addSimpleResponse({ speech: listSpeech,
-	        displayText: 'Alright! here are the lists' })
+	        displayText: 'Alright! here are the lists for ' + toTitleCase(givenName) })
 		      .addBasicCard(app.buildBasicCard(listString) // Note the two spaces before '\n' required for a
 		                            // line break to be rendered in the card
-		      .setTitle('Lists for '+givenName))
+		      .setTitle('Lists for '+toTitleCase(givenName)))
 		    );
 		    return;
 	  		}
