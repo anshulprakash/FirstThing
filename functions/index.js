@@ -74,7 +74,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		let userId = app.getUser().userId;
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
-		let sendNotification = false;
+		let sendNotification = true;
 		console.log(userId);
 		console.log(givenName);
 		console.log(listName);
@@ -511,7 +511,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	actionMap.set(FETCH_LISTS,readListsForOwner);
 	actionMap.set(ADD_PHONENUMBER,addPhoneNumber);
 	actionMap.set(INPUT_WELCOME, welcome);
-	actionMap.set(STOP_NOTIFICATION, stopNotifications);
+	actionMap.set(STOP_NOTIFICATION, stopNotification);
 
 	app.handleRequest(actionMap);
 
