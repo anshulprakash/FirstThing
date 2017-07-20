@@ -90,11 +90,26 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 
 	function welcome (app) {
 		console.log('inside welcome');
-
-		let message = 'Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start?';
+		//let userId = app.getUser().userId;
+		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
+		let profileUri = DATABASE_URL + 'profiles/' + userId +'.json';
+		let message = "Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start?";
+		let profileOptions ={
+  			method: 'GET',
+  			uri: profileUri,
+  			json: true
+  		}
+  		noderequest(profileOptions)  
+		.then(function (response) {
+			if(!response){
+				app.setContext('phone-number-added',1);
+			}
+			app.ask({speech: message, displayText: message});
+		})
+		.catch(function (err) {
+			console.log('Error while getting data', err);
+		});
 		
-		app.ask({speech: message,
-			     displayText: message});
 		return;
 	}
 
@@ -176,7 +191,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	  		let phoneNumber = "";
 	  		noderequest(profileOptions)  
 			.then(function (response) {
-				if(!response){
+				if(response!=null){
 					console.log("Notification: "+response['notification']);
 					sendNotification = response['notification']=="no" ? false : true;
 					phoneNumber = response['phone'];
