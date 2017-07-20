@@ -55,7 +55,12 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		let phoneNumber = app.getArgument(PHONE_NUMBER);
 
 		let postUri = DATABASE_URL + 'profiles/' + userId +'.json';
-		
+		let isWelcomeFlow = app.getContext('add-phone-number') == null ? false : true;
+		let successMsg = 'Got it. I\'ll send you a text when your users access their lists. You can cancel this at any time by telling me to stop notifications.';
+
+		if(isWelcomeFlow){
+			successMsg = successMsg + ' Ready to start a guided tour?';
+		}
 		const postOptions ={
   			method: 'PUT',
   			uri: postUri,
@@ -66,7 +71,6 @@ exports.firstThing = functions.https.onRequest((request, response) => {
   		}
   		noderequest(postOptions)  
 		.then(function (response) {
-			let successMsg = 'Got it. I\'ll send you a text when your users have arrived and started their lists. You can cancel this at any time by telling me to stop notifications. Ready to start a guided tour?';
 			app.ask({speech: successMsg,
 				     displayText: successMsg});
 		})
