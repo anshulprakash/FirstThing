@@ -35,6 +35,7 @@ const GUIDED_TOUR = 'guided-tour';
 // Twilio Credentials
 const accountSid = 'ACa280ebee55197ee9778f56bad859e768';
 const authToken = '11a1b1dd4549e9482aa369506767da06';
+const TWILIO_NUMBER = '+18163071770';
 
 //creates title case for functions
 function toTitleCase(str)
@@ -89,6 +90,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 
 	function welcome (app) {
 		console.log('inside welcome');
+
 		let message = 'Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start?';
 		
 		app.ask({speech: message,
@@ -174,22 +176,24 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	  		let phoneNumber = "";
 	  		noderequest(profileOptions)  
 			.then(function (response) {
-				console.log("Notification: "+response['notification']);
-				sendNotification = response['notification']=="no" ? false : true;
-				phoneNumber = response['phone'];
-				console.log('sendNotification: '+sendNotification);
-			    if(sendNotification){
-			    	let client = twilio(accountSid, authToken);
-				    client.messages
-					  .create({
-					    to: phoneNumber,
-					    from: '+18163071770',
-					    body: toTitleCase(givenName)+'\'s ' + listName +' list has been accessed',
-					  })
-					  .then((message) => console.log(message.sid))
-					  .catch(function (err) {
-							console.log(err);
-					  });
+				if(!response){
+					console.log("Notification: "+response['notification']);
+					sendNotification = response['notification']=="no" ? false : true;
+					phoneNumber = response['phone'];
+					console.log('sendNotification: '+sendNotification);
+				    if(sendNotification){
+				    	let client = twilio(accountSid, authToken);
+					    client.messages
+						  .create({
+						    to: phoneNumber,
+						    from: TWILIO_NUMBER,
+						    body: toTitleCase(givenName)+'\'s ' + listName +' list has been accessed',
+						  })
+						  .then((message) => console.log(message.sid))
+						  .catch(function (err) {
+								console.log(err);
+						  });
+					}
 			    }
 			})
 			.catch(function (err) {
