@@ -109,7 +109,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			if(response!=null){
 				console.log('adding context');
 				app.setContext('add-phone-number',0);
-				app.setContext('defaultwelcomeintent-followup',0);
+				//app.setContext('defaultwelcomeintent-followup',0);
 				app.setContext('phone-number-added',1);
 				message = "Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start a guided tour?";
 			}
