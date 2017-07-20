@@ -5,6 +5,7 @@ const App = require('actions-on-google').ApiAiApp;
 const functions = require('firebase-functions');
 const noderequest = require('request-promise');
 const twilio = require('twilio');
+const validator = require('validator');
 
 const DATABASE_URL = "https://vml-mobi-first-thing.firebaseio.com/";
 
@@ -48,14 +49,40 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	console.log('Request body: ' + JSON.stringify(request.body));
 
 	function addPhoneNumber (app) {
-		let userId = app.getUser().userId;
+		//let userId = app.getUser().userId;
+		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
 		let phoneNumber = app.getArgument(PHONE_NUMBER);
 
-		console.log('phoneNumber: '+phoneNumber);
-		let successMsg = 'Got it. I\'ll send you a text when your users have arrived and started their lists. You can cancel this at any time by telling me to stop notifications. Ready to start a guided tour?';
+		let postUri = DATABASE_URL + 'profiles/' + userId +'.json';
+		
+		const postOptions ={
+  			method: 'PUT',
+  			uri: postUri,
+  			json: {"phone": phoneNumber,
+  					"name": "directory assistance",
+  					"notification": "yes"
+				}
+  		}
+  		noderequest(postOptions)  
+		.then(function (response) {
+			let successMsg = 'Got it. I\'ll send you a text when your users have arrived and started their lists. You can cancel this at any time by telling me to stop notifications. Ready to start a guided tour?';
+			app.ask({speech: successMsg,
+				     displayText: successMsg});
+		})
+		.catch(function (err) {
+			console.log('Error while posting data', err);
+		});
 
-		app.ask({speech: successMsg,
-			     displayText: successMsg});
+		/*if(validator.isMobilePhone(phoneNumber,'en-US')){
+			let successMsg = 'Got it. I\'ll send you a text when your users have arrived and started their lists. You can cancel this at any time by telling me to stop notifications. Ready to start a guided tour?';
+			app.ask({speech: successMsg,
+				     displayText: successMsg});
+		}else{
+			let errorMsg = phoneNumber + ' is not a valid number! Would you like to enter phone number again?';
+			app.ask({speech: errorMsg,
+				     displayText: errorMsg});
+			app.setContext('welcome-guided-tour',0);
+		}*/
 		
 		return;
 	}
@@ -71,18 +98,19 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 
 	//gets tasks for a lists for a user
 	function readList (app) {
-		let userId = app.getUser().userId;
+		//let userId = app.getUser().userId;
+		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
-		let sendNotification = true;
+		let sendNotification = false;
 		console.log(userId);
 		console.log(givenName);
 		console.log(listName);
 
-		//let uri = DATABASE_URL + userId + '.json';
-		const options = {  
+		let getUri = DATABASE_URL + userId + '.json';
+		let options = {  
 		  method: 'GET',
-		  uri: "https://vml-mobi-first-thing.firebaseio.com/APhe68FJEPAHW8d9MpRdxOCluodn.json",
+		  uri: getUri,
 		  json: true
 		}
 		noderequest(options)  
@@ -136,22 +164,37 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		       .setTitle('List of tasks for '+toTitleCase(givenName)))
 		    );
 		    
-		    /*
-				TODO: fetch the notification flag and phone number
-		    */
-		    if(sendNotification){
-		    	let client = twilio(accountSid, authToken);
-			    client.messages
-				  .create({
-				    to: '+17146750966',
-				    from: '+18163071770',
-				    body: toTitleCase(givenName)+'\'s ' + listName +' has been accessed',
-				  })
-				  .then((message) => console.log(message.sid))
-				  .catch(function (err) {
-						console.log(err);
-				  });
-		    }
+		    let profileUri = DATABASE_URL + 'profiles/' + userId +'.json';
+		
+			let profileOptions ={
+	  			method: 'GET',
+	  			uri: profileUri,
+	  			json: true
+	  		}
+	  		let phoneNumber = "";
+	  		noderequest(profileOptions)  
+			.then(function (response) {
+				console.log("Notification: "+response['notification']);
+				sendNotification = response['notification']=="no" ? false : true;
+				phoneNumber = response['phone'];
+				console.log('sendNotification: '+sendNotification);
+			    if(sendNotification){
+			    	let client = twilio(accountSid, authToken);
+				    client.messages
+					  .create({
+					    to: phoneNumber,
+					    from: '+18163071770',
+					    body: toTitleCase(givenName)+'\'s ' + listName +' list has been accessed',
+					  })
+					  .then((message) => console.log(message.sid))
+					  .catch(function (err) {
+							console.log(err);
+					  });
+			    }
+			})
+			.catch(function (err) {
+				console.log('Error while getting data', err);
+			});
 		    
 		    return;
 		  })
@@ -435,6 +478,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	}
 
 	function readListsForOwner (app) {
+		//let userId = app.getUser().userId;
 		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let getUri = DATABASE_URL + userId + '/' + givenName + '.json';
@@ -484,11 +528,24 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	}
 
 	function stopNotification(app){
-		let userId = app.getUser().userId;
-
-		let successMsg = 'Okay! You have opted out of notifications.';
+		//let userId = app.getUser().userId;
+		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
+		let uri = DATABASE_URL + 'profiles/' + userId +'/notification.json';
 		
-		app.ask({speech: successMsg, displayText: successMsg});
+		let options ={
+  			method: 'PUT',
+  			uri: uri,
+  			json: "no"
+  		}
+  		noderequest(options)  
+		.then(function (response) {
+			let successMsg = 'Okay! You have opted out of notifications.';
+			app.ask({speech: successMsg, displayText: successMsg});
+		})
+		.catch(function (err) {
+			console.log('Error while posting data', err);
+		});
+
 		return;
 	}
 
