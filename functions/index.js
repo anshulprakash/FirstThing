@@ -101,9 +101,15 @@ exports.firstThing = functions.https.onRequest((request, response) => {
   		}
   		noderequest(profileOptions)  
 		.then(function (response) {
-			if(!response){
+			console.log('Response: '+response);
+			if(response!=null){
+				console.log('adding context');
+				app.setContext('add-phone-number',0);
+				app.setContext('defaultwelcomeintent-followup',0);
 				app.setContext('phone-number-added',1);
+				message = "Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start a guided tour?";
 			}
+			console.log(app.getContexts());
 			app.ask({speech: message, displayText: message});
 		})
 		.catch(function (err) {
