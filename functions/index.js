@@ -49,6 +49,9 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	console.log('Request headers: ' + JSON.stringify(request.headers));
 	console.log('Request body: ' + JSON.stringify(request.body));
 
+	const serverKey = 'AIzaSyBB3VMJTKdH14dg0tbCkByGo0cmpUY1lgo';
+	const googleAccessToken = app.getUser().accessToken;
+
 	function addPhoneNumber (app) {
 		//let userId = app.getUser().userId;
 		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
@@ -75,57 +78,68 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				     displayText: successMsg});
 		})
 		.catch(function (err) {
-			console.log('Error while posting data', err);
+			console.error(err);
 		});
-
-		/*if(validator.isMobilePhone(phoneNumber,'en-US')){
-			let successMsg = 'Got it. I\'ll send you a text when your users have arrived and started their lists. You can cancel this at any time by telling me to stop notifications. Ready to start a guided tour?';
-			app.ask({speech: successMsg,
-				     displayText: successMsg});
-		}else{
-			let errorMsg = phoneNumber + ' is not a valid number! Would you like to enter phone number again?';
-			app.ask({speech: errorMsg,
-				     displayText: errorMsg});
-			app.setContext('welcome-guided-tour',0);
-		}*/
 		
 		return;
 	}
 
 	function welcome (app) {
 		console.log('inside welcome');
-		//let userId = app.getUser().userId;
-		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
-		let profileUri = DATABASE_URL + 'profiles/' + userId +'.json';
-		let message = "Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start?";
-		let profileOptions ={
-  			method: 'GET',
-  			uri: profileUri,
-  			json: true
-  		}
-  		noderequest(profileOptions)  
-		.then(function (response) {
-			console.log('Response: '+response);
-			if(response!=null){
-				console.log('adding context');
-				app.setContext('add-phone-number',0);
-				//app.setContext('defaultwelcomeintent-followup',0);
-				app.setContext('phone-number-added',1);
-				message = "Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start a guided tour?";
-			}
-			console.log(app.getContexts());
-			app.ask({speech: message, displayText: message});
-		})
-		.catch(function (err) {
-			console.log('Error while getting data', err);
-		});
+
+		// Call Google People API for email addresses
+		let googleProfileUrl = 'https://people.googleapis.com/v1/people/me?requestMask.includeField=person.emailAddresses%2Cperson.names&key=' + serverKey;
+		let googleProfileRequestOptions = {
+		    method: 'GET',
+		    uri: googleProfileUrl,
+		    headers: {Authorization: 'Bearer ' + googleAccessToken},
+		    json: true
+		};
+
+		noderequest(googleProfileRequestOptions)
+	    .then(function (profileResponse) {
+	        if (profileResponse) {
+	            const emailAddress = profileResponse.emailAddresses[0].value;
+	            console.log('emailAddress: '+emailAddress);
+	            app.data.emailAddress = emailAddress;
+
+	            let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
+				let profileUri = DATABASE_URL + 'profiles/' + userId +'.json';
+				let message = "Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start?";
+				let profileOptions ={
+		  			method: 'GET',
+		  			uri: profileUri,
+		  			json: true
+		  		}
+		  		noderequest(profileOptions)
+				.then(function (response) {
+					console.log('Response: '+response);
+					if(response!=null){
+						console.log('adding context');
+						app.setContext('add-phone-number',0);
+						//app.setContext('defaultwelcomeintent-followup',0);
+						app.setContext('phone-number-added',1);
+						message = "Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start a guided tour?";
+					}
+					console.log(app.getContexts());
+					app.ask({speech: message, displayText: message});
+				})
+				.catch(function (err) {
+					console.error(err);
+				});
+	        }
+	    })
+	    .catch(function (err) {
+	        console.error(err);
+	    });
 		
 		return;
 	}
 
 	//gets tasks for a lists for a user
 	function readList (app) {
-		//let userId = app.getUser().userId;
+
+		console.log('inside readList and email address is: '+ app.data.emailAddress);
 		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
@@ -216,25 +230,25 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 						  })
 						  .then((message) => console.log(message.sid))
 						  .catch(function (err) {
-								console.log(err);
+								console.error(err);
 						  });
 					}
 			    }
 			})
 			.catch(function (err) {
-				console.log('Error while getting data', err);
+				console.error(err);
 			});
 		    
 		    return;
 		  })
 		  .catch(function (err) {
-		     console.log('Error while trying to retrieve data', err);
+		     console.error(err);
 		  });
 
 	}
 
 	function createList (app) {
-		//let userId = app.getUser().userId;
+		console.log('inside createList and email address is: '+ app.data.emailAddress);
 		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
@@ -272,7 +286,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			      		return;
 				})
 				.catch(function (err) {
-					console.log('Error while trying to retrieve data', err);
+					console.error(err);
 				 });
 		  	}else{
 		  		let people = Object.keys(response);
@@ -296,7 +310,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			      		return;
 					})
 				  	.catch(function (err) {
-				    	console.log('Error while trying to retrieve data', err);
+				    	console.error(err);
 				  	});
 		  		}else{
 		  			let lists = Object.keys(response[givenName]);
@@ -321,7 +335,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				      		return;
 						})
 					  	.catch(function (err) {
-					    	console.log('Error while trying to retrieve data', err);
+					    	console.error(err);
 					  	});
 				  	}
 		  		}
@@ -329,7 +343,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  	}
 		 })
 		  .catch(function (err) {
-		    console.log('Error while trying to retrieve data', err);
+		    console.error(err);
 		 });
 
 		 return; 
@@ -337,7 +351,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	}
 
 	function addItemToList (app) {
-		//let userId = app.getUser().userId;
+		console.log('inside addItemToList and email address is: '+ app.data.emailAddress);
 		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
@@ -393,7 +407,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			      	return;
 				})
 				.catch(function (err) {
-					console.log('Error while trying to retrieve data', err);
+					console.error(err);
 				});
 		  	}else{
 		  		let people = Object.keys(response);
@@ -422,7 +436,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			      		return;
 					})
 				  	.catch(function (err) {
-				    	console.log('Error while trying to retrieve data', err);
+				    	console.error(err);
 				  	});
 		  		}else{
 		  			let lists = Object.keys(response[givenName]);
@@ -449,7 +463,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				      		return;
 						})
 					  	.catch(function (err) {
-					    	console.log('Error while trying to retrieve data', err);
+					    	console.error(err);
 					  	});
 		  			}else{
 		  				//add item to list
@@ -492,7 +506,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 								}
 							})
 							.catch(function (err) {
-					    		console.log('Error while trying to retrieve data', err);
+					    		console.error(err);
 					  		});	
 		  				}
 		  			}
@@ -500,14 +514,14 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		  	}
 		})
 		  .catch(function (err) {
-		    console.log('Error while trying to retrieve data', err);
+		    console.error(err);
 		});
 
 		return; 
 	}
 
 	function readListsForOwner (app) {
-		//let userId = app.getUser().userId;
+		console.log('inside readListsForOwner and email address is: '+ app.data.emailAddress);
 		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let getUri = DATABASE_URL + userId + '/' + givenName + '.json';
@@ -527,9 +541,6 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		 }else{
 		 	let lists = Object.keys(response);
 		  	let listArray = [];
-
-	  		
-			
 		    let listString = "";
 		    let listSpeech = SSML_SPEAK_START + 'Alright! here are the lists for ' + givenName + '<break time="0.5s" />';
 
@@ -551,13 +562,13 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	  		}
 		 })
 	  	.catch(function (err) {
-	    	console.log('Error while trying to retrieve data', err);
+	    	console.error(err);
 	  	});
 
 	}
 
 	function stopNotification(app){
-		//let userId = app.getUser().userId;
+		console.log('inside stopNotification and email address is: '+ app.data.emailAddress);
 		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
 		let uri = DATABASE_URL + 'profiles/' + userId +'/notification.json';
 		
@@ -572,7 +583,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			app.ask({speech: successMsg, displayText: successMsg});
 		})
 		.catch(function (err) {
-			console.log('Error while posting data', err);
+			console.error(err);
 		});
 
 		return;
