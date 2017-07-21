@@ -52,38 +52,6 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	const serverKey = 'AIzaSyBB3VMJTKdH14dg0tbCkByGo0cmpUY1lgo';
 	const googleAccessToken = app.getUser().accessToken;
 
-	function addPhoneNumber (app) {
-		//let userId = app.getUser().userId;
-		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
-		let phoneNumber = app.getArgument(PHONE_NUMBER);
-
-		let postUri = DATABASE_URL + 'profiles/' + userId +'.json';
-		let isWelcomeFlow = app.getContext('add-phone-number') == null ? false : true;
-		let successMsg = 'Got it. I\'ll send you a text when your users access their lists. You can cancel this at any time by telling me to stop notifications.';
-
-		if(isWelcomeFlow){
-			successMsg = successMsg + ' Ready to start a guided tour?';
-		}
-		const postOptions ={
-  			method: 'PUT',
-  			uri: postUri,
-  			json: {"phone": phoneNumber,
-  					"name": "directory assistance",
-  					"notification": "yes"
-				}
-  		}
-  		noderequest(postOptions)  
-		.then(function (response) {
-			app.ask({speech: successMsg,
-				     displayText: successMsg});
-		})
-		.catch(function (err) {
-			console.error(err);
-		});
-		
-		return;
-	}
-
 	function welcome (app) {
 		console.log('inside welcome');
 
@@ -100,10 +68,11 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	    .then(function (profileResponse) {
 	        if (profileResponse) {
 	            const emailAddress = profileResponse.emailAddresses[0].value;
-	            console.log('emailAddress: '+emailAddress);
-	            app.data.emailAddress = emailAddress;
+	            const personId = profileResponse.resourceName.split('/')[1];
+	            console.log('person_id: '+personId);
+	            app.data.personId = personId;
 
-	            let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
+	            let userId = app.data.personId;
 				let profileUri = DATABASE_URL + 'profiles/' + userId +'.json';
 				let message = "Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start?";
 				let profileOptions ={
@@ -136,11 +105,43 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		return;
 	}
 
+	function addPhoneNumber (app) {
+		//let userId = app.getUser().userId;
+		let userId = app.data.personId;
+		let phoneNumber = app.getArgument(PHONE_NUMBER);
+
+		let postUri = DATABASE_URL + 'profiles/' + userId +'.json';
+		let isWelcomeFlow = app.getContext('add-phone-number') == null ? false : true;
+		let successMsg = 'Got it. I\'ll send you a text when your users access their lists. You can cancel this at any time by telling me to stop notifications.';
+
+		if(isWelcomeFlow){
+			successMsg = successMsg + ' Ready to start a guided tour?';
+		}
+		const postOptions ={
+  			method: 'PUT',
+  			uri: postUri,
+  			json: {"phone": phoneNumber,
+  					"name": "directory assistance",
+  					"notification": "yes"
+				}
+  		}
+  		noderequest(postOptions)  
+		.then(function (response) {
+			app.ask({speech: successMsg,
+				     displayText: successMsg});
+		})
+		.catch(function (err) {
+			console.error(err);
+		});
+		
+		return;
+	}
+
 	//gets tasks for a lists for a user
 	function readList (app) {
 
-		console.log('inside readList and email address is: '+ app.data.emailAddress);
-		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
+		console.log('inside readList and personId is: '+ app.data.personId);
+		let userId = app.data.personId;
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
 		let sendNotification = false;
@@ -248,8 +249,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	}
 
 	function createList (app) {
-		console.log('inside createList and email address is: '+ app.data.emailAddress);
-		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
+		console.log('inside createList and personId is: '+ app.data.personId);
+		let userId = app.data.personId;
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
 
@@ -351,8 +352,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	}
 
 	function addItemToList (app) {
-		console.log('inside addItemToList and email address is: '+ app.data.emailAddress);
-		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
+		console.log('inside addItemToList and personId is: '+ app.data.personId);
+		let userId = app.data.personId;
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let listName = app.getArgument(LIST_NAME).toLowerCase();
 		let listItem = app.getArgument(LIST_ITEM).toLowerCase();
@@ -521,8 +522,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	}
 
 	function readListsForOwner (app) {
-		console.log('inside readListsForOwner and email address is: '+ app.data.emailAddress);
-		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
+		console.log('inside addItemToList and personId is: '+ app.data.personId);
+		let userId = app.data.personId;
 		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 		let getUri = DATABASE_URL + userId + '/' + givenName + '.json';
 		const getOptions = {  
@@ -541,6 +542,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		 }else{
 		 	let lists = Object.keys(response);
 		  	let listArray = [];
+
 		    let listString = "";
 		    let listSpeech = SSML_SPEAK_START + 'Alright! here are the lists for ' + givenName + '<break time="0.5s" />';
 
@@ -568,8 +570,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	}
 
 	function stopNotification(app){
-		console.log('inside stopNotification and email address is: '+ app.data.emailAddress);
-		let userId = 'APhe68FJEPAHW8d9MpRdxOCluodn';
+		//let userId = app.getUser().userId;
+		let userId = app.data.personId;
 		let uri = DATABASE_URL + 'profiles/' + userId +'/notification.json';
 		
 		let options ={
