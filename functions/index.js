@@ -50,24 +50,20 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	console.log('Request body: ' + JSON.stringify(request.body));
 
 	const serverKey = 'AIzaSyBB3VMJTKdH14dg0tbCkByGo0cmpUY1lgo';
-	const googleAccessToken = app.getUser().accessToken;
+	const googleProfileUrl = 'https://people.googleapis.com/v1/people/me?requestMask.includeField=person.emailAddresses%2Cperson.names&key=' + serverKey;
+	
+	let googleProfileRequestOptions = {
+		    method: 'GET',
+		    uri: googleProfileUrl,
+		    headers: {Authorization: 'Bearer ' + app.getUser().accessToken},
+		    json: true
+	};
 
 	function welcome (app) {
 		console.log('inside welcome');
-
-		// Call Google People API for email addresses
-		let googleProfileUrl = 'https://people.googleapis.com/v1/people/me?requestMask.includeField=person.emailAddresses%2Cperson.names&key=' + serverKey;
-		let googleProfileRequestOptions = {
-		    method: 'GET',
-		    uri: googleProfileUrl,
-		    headers: {Authorization: 'Bearer ' + googleAccessToken},
-		    json: true
-		};
-
 		noderequest(googleProfileRequestOptions)
 	    .then(function (profileResponse) {
 	        if (profileResponse) {
-	            const emailAddress = profileResponse.emailAddresses[0].value;
 	            const personId = profileResponse.resourceName.split('/')[1];
 	            console.log('person_id: '+personId);
 	            app.data.personId = personId;
@@ -104,230 +100,259 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		
 		return;
 	}
-
+	//function to start notifications or to add phone number
 	function addPhoneNumber (app) {
-		//let userId = app.getUser().userId;
-		let userId = app.data.personId;
-		let phoneNumber = app.getArgument(PHONE_NUMBER);
 
-		let postUri = DATABASE_URL + 'profiles/' + userId +'.json';
-		let isWelcomeFlow = app.getContext('add-phone-number') == null ? false : true;
-		let successMsg = 'Got it. I\'ll send you a text when your users access their lists. You can cancel this at any time by telling me to stop notifications.';
-
-		if(isWelcomeFlow){
-			successMsg = successMsg + ' Ready to start a guided tour?';
+		if(!app.data.personId){
+			noderequest(googleProfileRequestOptions)
+		    .then(function (profileResponse) {
+		        if (profileResponse) {
+		        	const personId = profileResponse.resourceName.split('/')[1];
+		            console.log('person_id: '+personId);
+		            app.data.personId = personId;
+		            subAddPhoneNumber();
+		            }
+		    })
+		    .catch(function (err) {
+		        console.error(err);
+		    });
+		}else{
+			subAddPhoneNumber();
 		}
-		const postOptions ={
-  			method: 'PUT',
-  			uri: postUri,
-  			json: {"phone": phoneNumber,
-  					"name": "directory assistance",
-  					"notification": "yes"
-				}
-  		}
-  		noderequest(postOptions)  
-		.then(function (response) {
-			app.ask({speech: successMsg,
-				     displayText: successMsg});
-		})
-		.catch(function (err) {
-			console.error(err);
-		});
 		
-		return;
-	}
+		function subAddPhoneNumber(){
+			let userId = app.data.personId;
+			let phoneNumber = app.getArgument(PHONE_NUMBER);
+			let postUri = DATABASE_URL + 'profiles/' + userId +'.json';
+			let isWelcomeFlow = app.getContext('add-phone-number') == null ? false : true;
+			let successMsg = 'Got it. I\'ll send you a text when your users access their lists. You can cancel this at any time by telling me to stop notifications.';
 
-	//gets tasks for a lists for a user
-	function readList (app) {
-
-		console.log('inside readList and personId is: '+ app.data.personId);
-		let userId = app.data.personId;
-		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
-		let listName = app.getArgument(LIST_NAME).toLowerCase();
-		let sendNotification = false;
-		console.log(userId);
-		console.log(givenName);
-		console.log(listName);
-
-		let getUri = DATABASE_URL + userId + '.json';
-		let options = {  
-		  method: 'GET',
-		  uri: getUri,
-		  json: true
-		}
-		noderequest(options)  
-		  .then(function (response) { 
-		  	console.log('response from database: '+ JSON.stringify(response));
-
-		  	let people = Object.keys(response);
-
-		  	if(people.indexOf(givenName) == -1){
-		  		//givenName does not have any list
-		  		app.ask({speech: 'Sorry! There is no list for '+ givenName,
-	      			displayText: 'Sorry! There is no list for '+ toTitleCase(givenName)});
-
-		  		return;
-		  	}
-		  	console.log(people)
-		  	let lists = Object.keys(response[givenName]);
-
-		  	if(lists.indexOf(listName) == -1){
-		  		app.ask({speech: 'Sorry! There is no list by the name '+listName+' for '+ givenName ,
-	      		displayText: 'Sorry! There is no list by the name '+listName+' for '+ toTitleCase(givenName)});
-	      		return;
-		  	}
-
-		  	let tasks = Object.keys(response[givenName][listName]);
-		  	let taskArray = [];
-
-	  		tasks.forEach(function(task){
-				let value = response[givenName][listName][task]['task'];
-				//If list is empty
-				if(!value){
-					app.ask({speech: 'There are no tasks currently for '+givenName+'\'s '+listName+' list',
-			      		displayText: 'There are no tasks currently for '+toTitleCase(givenName)+'\'s '+listName+' list'});
-			    	return;
-				}
-				taskArray.push(value);
-			});
-			
-		    let taskListString = "";
-		    let taskListSpeech = SSML_SPEAK_START + 'Alright! here are the tasks for '+givenName+ '<break time="0.5s" />';
-
-		    taskArray.forEach(function(task){
-				taskListString = taskListString + task + '  \n';
-				taskListSpeech = taskListSpeech + task + '<break time="0.5s" />';
-			});
-			taskListSpeech = taskListSpeech + SSML_SPEAK_END;
-			console.log('debugggg '+taskListString);
-		    app.ask(app.buildRichResponse()
-		       .addSimpleResponse({ speech: taskListSpeech, displayText: 'Alright! here are the tasks for '+toTitleCase(givenName) })
-		       .addBasicCard(app.buildBasicCard(taskListString) 
-		       .setTitle('List of tasks for '+toTitleCase(givenName)))
-		    );
-		    
-		    let profileUri = DATABASE_URL + 'profiles/' + userId +'.json';
-		
-			let profileOptions ={
-	  			method: 'GET',
-	  			uri: profileUri,
-	  			json: true
-	  		}
-	  		let phoneNumber = "";
-	  		noderequest(profileOptions)  
-			.then(function (response) {
-				if(response!=null){
-					console.log("Notification: "+response['notification']);
-					sendNotification = response['notification']=="no" ? false : true;
-					phoneNumber = response['phone'];
-					console.log('sendNotification: '+sendNotification);
-				    if(sendNotification){
-				    	let client = twilio(accountSid, authToken);
-					    client.messages
-						  .create({
-						    to: phoneNumber,
-						    from: TWILIO_NUMBER,
-						    body: toTitleCase(givenName)+'\'s ' + listName +' list has been accessed',
-						  })
-						  .then((message) => console.log(message.sid))
-						  .catch(function (err) {
-								console.error(err);
-						  });
+			if(isWelcomeFlow){
+				successMsg = successMsg + ' Ready to start a guided tour?';
+			}
+			const postOptions ={
+	  			method: 'PUT',
+	  			uri: postUri,
+	  			json: {"phone": phoneNumber,
+	  					"name": "directory assistance",
+	  					"notification": "yes"
 					}
-			    }
+	  		}
+	  		noderequest(postOptions)  
+			.then(function (response) {
+				app.ask({speech: successMsg,
+					     displayText: successMsg});
 			})
 			.catch(function (err) {
 				console.error(err);
 			});
-		    
-		    return;
-		  })
-		  .catch(function (err) {
-		     console.error(err);
-		  });
-
+			
+			return;
+		}
+		
 	}
 
-	function createList (app) {
-		console.log('inside createList and personId is: '+ app.data.personId);
-		let userId = app.data.personId;
-		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
-		let listName = app.getArgument(LIST_NAME).toLowerCase();
-
-		let createListSuccessTxt = 'List created by the name \''+listName+'\' for '+toTitleCase(givenName);
-		let createListSuccessSpeech = 'List created by the name '+listName+' for '+givenName;
-		let errorMsg = 'There is already a list by the name \''+listName+'\' for '+toTitleCase(givenName);
-		let errorSpeech = 'There is already a list by the name '+listName+' for '+givenName;
-
-		let getUri = DATABASE_URL + userId + '.json';
-		const getOptions = {  
-		  method: 'GET',
-		  uri: getUri,
-		  json: true
+	//gets tasks for a lists for a user
+	function readList (app) {
+		if(!app.data.personId){
+			noderequest(googleProfileRequestOptions)
+		    .then(function (profileResponse) {
+		        if (profileResponse) {
+		        	const personId = profileResponse.resourceName.split('/')[1];
+		            console.log('person_id: '+personId);
+		            app.data.personId = personId;
+		            subReadlist();
+		            }
+		    })
+		    .catch(function (err) {
+		        console.error(err);
+		    });
+		}else{
+			subReadlist();
 		}
 
-		noderequest(getOptions)  
-		  .then(function (response) {
-		  	//If the userId is not in the database
-		  	if(response == null){
-		  		const putOptions ={
-		  			method: 'PUT',
-		  			uri: getUri,
-		  			json: {[givenName]: 
-		  					{[listName]: [
-            								"__empty_list"
-        								] 
-        					}
-        				}
+		function subReadlist(){
+			console.log('inside readList and personId is: '+ app.data.personId);
+			let userId = app.data.personId;
+			let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
+			let listName = app.getArgument(LIST_NAME).toLowerCase();
+			let sendNotification = false;
+			console.log(userId);
+			console.log(givenName);
+			console.log(listName);
+
+			let getUri = DATABASE_URL + userId + '.json';
+			let options = {  
+			  method: 'GET',
+			  uri: getUri,
+			  json: true
+			}
+			noderequest(options)  
+			  .then(function (response) { 
+			  	console.log('response from database: '+ JSON.stringify(response));
+
+			  	let people = Object.keys(response);
+
+			  	if(people.indexOf(givenName) == -1){
+			  		//givenName does not have any list
+			  		app.ask({speech: 'Sorry! There is no list for '+ givenName,
+		      			displayText: 'Sorry! There is no list for '+ toTitleCase(givenName)});
+
+			  		return;
+			  	}
+			  	console.log(people)
+			  	let lists = Object.keys(response[givenName]);
+
+			  	if(lists.indexOf(listName) == -1){
+			  		app.ask({speech: 'Sorry! There is no list by the name '+listName+' for '+ givenName ,
+		      		displayText: 'Sorry! There is no list by the name '+listName+' for '+ toTitleCase(givenName)});
+		      		return;
+			  	}
+
+			  	let tasks = Object.keys(response[givenName][listName]);
+			  	let taskArray = [];
+
+		  		tasks.forEach(function(task){
+					let value = response[givenName][listName][task]['task'];
+					//If list is empty
+					if(!value){
+						app.ask({speech: 'There are no tasks currently for '+givenName+'\'s '+listName+' list',
+				      		displayText: 'There are no tasks currently for '+toTitleCase(givenName)+'\'s '+listName+' list'});
+				    	return;
+					}
+					taskArray.push(value);
+				});
+				
+			    let taskListString = "";
+			    let taskListSpeech = SSML_SPEAK_START + 'Alright! here are the tasks for '+givenName+ '<break time="0.5s" />';
+
+			    taskArray.forEach(function(task){
+					taskListString = taskListString + task + '  \n';
+					taskListSpeech = taskListSpeech + task + '<break time="0.5s" />';
+				});
+				taskListSpeech = taskListSpeech + SSML_SPEAK_END;
+				console.log('debugggg '+taskListString);
+			    app.ask(app.buildRichResponse()
+			       .addSimpleResponse({ speech: taskListSpeech, displayText: 'Alright! here are the tasks for '+toTitleCase(givenName) })
+			       .addBasicCard(app.buildBasicCard(taskListString) 
+			       .setTitle('List of tasks for '+toTitleCase(givenName)))
+			    );
+			    
+			    let profileUri = DATABASE_URL + 'profiles/' + userId +'.json';
+			
+				let profileOptions ={
+		  			method: 'GET',
+		  			uri: profileUri,
+		  			json: true
 		  		}
-		  		noderequest(putOptions)  
+		  		let phoneNumber = "";
+		  		noderequest(profileOptions)  
 				.then(function (response) {
-					app.ask({speech: createListSuccessSpeech,
-			      		displayText: createListSuccessTxt});
-			      		return;
+					if(response!=null){
+						console.log("Notification: "+response['notification']);
+						sendNotification = response['notification']=="no" ? false : true;
+						phoneNumber = response['phone'];
+						console.log('sendNotification: '+sendNotification);
+					    if(sendNotification){
+					    	let client = twilio(accountSid, authToken);
+						    client.messages
+							  .create({
+							    to: phoneNumber,
+							    from: TWILIO_NUMBER,
+							    body: toTitleCase(givenName)+'\'s ' + listName +' list has been accessed',
+							  })
+							  .then((message) => console.log(message.sid))
+							  .catch(function (err) {
+									console.error(err);
+							  });
+						}
+				    }
 				})
 				.catch(function (err) {
 					console.error(err);
-				 });
-		  	}else{
-		  		let people = Object.keys(response);
+				});
+			    
+			    return;
+			  })
+			  .catch(function (err) {
+			     console.error(err);
+			  });
+		}
 
-		  		//givenName does not exist under the userId
-		  		if(people.indexOf(givenName) == -1){
-		  			console.log('givenName does not have any list');
-		  			let putUri = DATABASE_URL + userId + '/' + givenName +'.json';
-		  			const putOptions ={
-		  			method: 'PUT',
-		  			uri: putUri,
-		  			json: {[listName]: [
-            								"__empty_list"
-        								] 
-        				}
-		  			}
-		  			noderequest(putOptions)  
-				  	.then(function (response) {
-				  		app.ask({speech: createListSuccessSpeech,
-			      		displayText: createListSuccessTxt});
-			      		return;
+	}
+	//This function is used to create lists
+	function createList (app) {
+		if(!app.data.personId){
+			noderequest(googleProfileRequestOptions)
+		    .then(function (profileResponse) {
+		        if (profileResponse) {
+		        	const personId = profileResponse.resourceName.split('/')[1];
+		            console.log('person_id: '+personId);
+		            app.data.personId = personId;
+		            subCreateList();
+		            }
+		    })
+		    .catch(function (err) {
+		        console.error(err);
+		    });
+		}else{
+			subCreateList();
+		}
+		function subCreateList(){
+			console.log('inside createList and personId is: '+ app.data.personId);
+			let userId = app.data.personId;
+			let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
+			let listName = app.getArgument(LIST_NAME).toLowerCase();
+
+			let createListSuccessTxt = 'List created by the name \''+listName+'\' for '+toTitleCase(givenName);
+			let createListSuccessSpeech = 'List created by the name '+listName+' for '+givenName;
+			let errorMsg = 'There is already a list by the name \''+listName+'\' for '+toTitleCase(givenName);
+			let errorSpeech = 'There is already a list by the name '+listName+' for '+givenName;
+
+			let getUri = DATABASE_URL + userId + '.json';
+			const getOptions = {  
+			  method: 'GET',
+			  uri: getUri,
+			  json: true
+			}
+
+			noderequest(getOptions)  
+			  .then(function (response) {
+			  	//If the userId is not in the database
+			  	if(response == null){
+			  		const putOptions ={
+			  			method: 'PUT',
+			  			uri: getUri,
+			  			json: {[givenName]: 
+			  					{[listName]: [
+	            								"__empty_list"
+	        								] 
+	        					}
+	        				}
+			  		}
+			  		noderequest(putOptions)  
+					.then(function (response) {
+						app.ask({speech: createListSuccessSpeech,
+				      		displayText: createListSuccessTxt});
+				      		return;
 					})
-				  	.catch(function (err) {
-				    	console.error(err);
-				  	});
-		  		}else{
-		  			let lists = Object.keys(response[givenName]);
-		  			//If there is already a list by the listName for givenName
-		  			if(lists.indexOf(listName) > -1){
-		  				console.log('list name already exits');
-				  		app.ask({speech: errorSpeech,
-			      		displayText: errorMsg});
-			      		return;
-				  	}else{
-				  		console.log('Creating list for' + givenName);
-				  		let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'.json';
+					.catch(function (err) {
+						console.error(err);
+					 });
+			  	}else{
+			  		let people = Object.keys(response);
+
+			  		//givenName does not exist under the userId
+			  		if(people.indexOf(givenName) == -1){
+			  			console.log('givenName does not have any list');
+			  			let putUri = DATABASE_URL + userId + '/' + givenName +'.json';
 			  			const putOptions ={
-				  			method: 'PUT',
-				  			uri: putUri,
-				  			json: ["__empty_list"]
+			  			method: 'PUT',
+			  			uri: putUri,
+			  			json: {[listName]: [
+	            								"__empty_list"
+	        								] 
+	        				}
 			  			}
 			  			noderequest(putOptions)  
 					  	.then(function (response) {
@@ -338,121 +363,139 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 					  	.catch(function (err) {
 					    	console.error(err);
 					  	});
-				  	}
-		  		}
+			  		}else{
+			  			let lists = Object.keys(response[givenName]);
+			  			//If there is already a list by the listName for givenName
+			  			if(lists.indexOf(listName) > -1){
+			  				console.log('list name already exits');
+					  		app.ask({speech: errorSpeech,
+				      		displayText: errorMsg});
+				      		return;
+					  	}else{
+					  		console.log('Creating list for' + givenName);
+					  		let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'.json';
+				  			const putOptions ={
+					  			method: 'PUT',
+					  			uri: putUri,
+					  			json: ["__empty_list"]
+				  			}
+				  			noderequest(putOptions)  
+						  	.then(function (response) {
+						  		app.ask({speech: createListSuccessSpeech,
+					      		displayText: createListSuccessTxt});
+					      		return;
+							})
+						  	.catch(function (err) {
+						    	console.error(err);
+						  	});
+					  	}
+			  		}
 
-		  	}
-		 })
-		  .catch(function (err) {
-		    console.error(err);
-		 });
+			  	}
+			 })
+			  .catch(function (err) {
+			    console.error(err);
+			 });
 
-		 return; 
+			 return; 
+		}
 
 	}
 
 	function addItemToList (app) {
-		console.log('inside addItemToList and personId is: '+ app.data.personId);
-		let userId = app.data.personId;
-		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
-		let listName = app.getArgument(LIST_NAME).toLowerCase();
-		let listItem = app.getArgument(LIST_ITEM).toLowerCase();
-		let recurringValue = app.getArgument(RECURRING_VALUE);
 
-		recurringValue = recurringValue ? recurringValue.toLowerCase() : "no";
-		console.log('recurring_value= '+recurringValue);
-
-		let itemAddedMsg = recurringValue == "no" ? 'Got it. \''+listItem+ '\' added to '+toTitleCase(givenName)+'\'s '+listName+' list' : 'Got it. \''+listItem+'\' will repeat '+recurringValue+' for '+toTitleCase(givenName);
-		let itemAddedMsgGuided = 'Perfect! To read this list you can say \'OK Google, ask FirstThing what\'s on '+ toTitleCase(givenName)+ '\'s '+listName+' list?';
-		let addItemToListError = '\''+listItem +'\''+ ' is already there in '+toTitleCase(givenName)+'\'s '+ listName +' list';
-		
-		let isGuidedTour = app.getContext(GUIDED_TOUR) ? true : false;
-		console.log('isGuidedTour'+isGuidedTour);
-		//remove the guided tour context
-		app.setContext(GUIDED_TOUR,0);
-
-		
-
-		let getUri = DATABASE_URL + userId + '.json';
-		const getOptions = {  
-		  method: 'GET',
-		  uri: getUri,
-		  json: true
+		if(!app.data.personId){
+			noderequest(googleProfileRequestOptions)
+		    .then(function (profileResponse) {
+		        if (profileResponse) {
+		        	const personId = profileResponse.resourceName.split('/')[1];
+		            console.log('person_id: '+personId);
+		            app.data.personId = personId;
+		            subAddItemToList();
+		            }
+		    })
+		    .catch(function (err) {
+		        console.error(err);
+		    });
+		}else{
+			subAddItemToList();
 		}
-		console.log("USER ID: "+userId);
-		noderequest(getOptions)  
-		  .then(function (response) {
-		  	console.log("RESPONSE: "+response);
-		  	//If the userId is not in the database
-		  	if(response == null){
-		  		//create a list and add item to it
-		  		console.log('If the userId is not in the database');
-		  		const putOptions ={
-		  			method: 'PUT',
-		  			uri: getUri,
-		  			json: {[givenName]: 
-		  					{[listName]: [{
-            								"recurring" : recurringValue,
-            								"task" : listItem
-        								 }] 
-        					}
-        				}
-		  		}
-		  		noderequest(putOptions)  
-				.then(function (response) {
-					if(isGuidedTour){
-						app.ask({speech: itemAddedMsgGuided, displayText: itemAddedMsgGuided});
-					}else{
-						app.ask({speech: itemAddedMsg, displayText: itemAddedMsg});
-					}
-			      	return;
-				})
-				.catch(function (err) {
-					console.error(err);
-				});
-		  	}else{
-		  		let people = Object.keys(response);
-		  		//If the givenName is not there under the userId
-		  		if(people.indexOf(givenName) == -1){
-		  			console.log('If the givenName is not there under the userId');
-		  			//create a list with listName for givenName and add listItem to it
-		  			let putUri = DATABASE_URL + userId + '/' + givenName +'.json';
-		  			const putOptions ={
-		  			method: 'PUT',
-		  			uri: putUri,
-		  			json: {[listName]:
-            							[{
-            								"recurring" : recurringValue,
-            								"task" : listItem
-        								}]
-        				}
-		  			}
-		  			noderequest(putOptions)  
-				  	.then(function (response) {
-				  		if(isGuidedTour){
+
+		function subAddItemToList(){
+			console.log('inside addItemToList and personId is: '+ app.data.personId);
+			let userId = app.data.personId;
+			let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
+			let listName = app.getArgument(LIST_NAME).toLowerCase();
+			let listItem = app.getArgument(LIST_ITEM).toLowerCase();
+			let recurringValue = app.getArgument(RECURRING_VALUE);
+
+			recurringValue = recurringValue ? recurringValue.toLowerCase() : "no";
+			console.log('recurring_value= '+recurringValue);
+
+			let itemAddedMsg = recurringValue == "no" ? 'Got it. \''+listItem+ '\' added to '+toTitleCase(givenName)+'\'s '+listName+' list' : 'Got it. \''+listItem+'\' will repeat '+recurringValue+' for '+toTitleCase(givenName);
+			let itemAddedMsgGuided = 'Perfect! To read this list you can say \'OK Google, ask FirstThing what\'s on '+ toTitleCase(givenName)+ '\'s '+listName+' list?';
+			let addItemToListError = '\''+listItem +'\''+ ' is already there in '+toTitleCase(givenName)+'\'s '+ listName +' list';
+			
+			let isGuidedTour = app.getContext(GUIDED_TOUR) ? true : false;
+			console.log('isGuidedTour'+isGuidedTour);
+			//remove the guided tour context
+			app.setContext(GUIDED_TOUR,0);
+
+			
+
+			let getUri = DATABASE_URL + userId + '.json';
+			const getOptions = {  
+			  method: 'GET',
+			  uri: getUri,
+			  json: true
+			}
+			console.log("USER ID: "+userId);
+			noderequest(getOptions)  
+			  .then(function (response) {
+			  	console.log("RESPONSE: "+response);
+			  	//If the userId is not in the database
+			  	if(response == null){
+			  		//create a list and add item to it
+			  		console.log('If the userId is not in the database');
+			  		const putOptions ={
+			  			method: 'PUT',
+			  			uri: getUri,
+			  			json: {[givenName]: 
+			  					{[listName]: [{
+	            								"recurring" : recurringValue,
+	            								"task" : listItem
+	        								 }] 
+	        					}
+	        				}
+			  		}
+			  		noderequest(putOptions)  
+					.then(function (response) {
+						if(isGuidedTour){
 							app.ask({speech: itemAddedMsgGuided, displayText: itemAddedMsgGuided});
 						}else{
 							app.ask({speech: itemAddedMsg, displayText: itemAddedMsg});
 						}
-			      		return;
+				      	return;
 					})
-				  	.catch(function (err) {
-				    	console.error(err);
-				  	});
-		  		}else{
-		  			let lists = Object.keys(response[givenName]);
-		  			//if there is no list by the name of listName
-		  			if(lists.indexOf(listName) == -1){
-		  				console.log('if there is no list by the name of listName');
-		  				//add listName under givenName and add listItem to it
-		  				let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'.json';
+					.catch(function (err) {
+						console.error(err);
+					});
+			  	}else{
+			  		let people = Object.keys(response);
+			  		//If the givenName is not there under the userId
+			  		if(people.indexOf(givenName) == -1){
+			  			console.log('If the givenName is not there under the userId');
+			  			//create a list with listName for givenName and add listItem to it
+			  			let putUri = DATABASE_URL + userId + '/' + givenName +'.json';
 			  			const putOptions ={
-				  			method: 'PUT',
-				  			uri: putUri,
-				  			json: [{
-            								"recurring" : recurringValue,
-            								"task" : listItem
-        							}]
+			  			method: 'PUT',
+			  			uri: putUri,
+			  			json: {[listName]:
+	            							[{
+	            								"recurring" : recurringValue,
+	            								"task" : listItem
+	        								}]
+	        				}
 			  			}
 			  			noderequest(putOptions)  
 					  	.then(function (response) {
@@ -466,37 +509,20 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 					  	.catch(function (err) {
 					    	console.error(err);
 					  	});
-		  			}else{
-		  				//add item to list
-		  				console.log('add item to list');
-		  				let tasks = Object.keys(response[givenName][listName]);
-		  				let count = tasks.length;
-		  				let alreadyPresent = false;
-		  				tasks.forEach(function(task){
-							let value = response[givenName][listName][task]['task'];		
-							if(!value){
-								console.log('Empty List');
-								count = 0;
-							}
-							if(value===listItem){
-								alreadyPresent = true;
-							}
-						});
-		  				if(alreadyPresent){
-		  					app.ask({speech: addItemToListError,
-			      			displayText: addItemToListError});
-			      			console.log('value===listItem');
-			      			return;
-		  				}else{
-		  					let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'/'+ count.toString() +'.json';
-							console.log('PUT URL: '+putUri);
+			  		}else{
+			  			let lists = Object.keys(response[givenName]);
+			  			//if there is no list by the name of listName
+			  			if(lists.indexOf(listName) == -1){
+			  				console.log('if there is no list by the name of listName');
+			  				//add listName under givenName and add listItem to it
+			  				let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'.json';
 				  			const putOptions ={
 					  			method: 'PUT',
 					  			uri: putUri,
-					  			json: {
-	            						"recurring" : recurringValue,
-	            						"task" : listItem
-	        						  }
+					  			json: [{
+	            								"recurring" : recurringValue,
+	            								"task" : listItem
+	        							}]
 				  			}
 				  			noderequest(putOptions)  
 						  	.then(function (response) {
@@ -505,90 +531,173 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 								}else{
 									app.ask({speech: itemAddedMsg, displayText: itemAddedMsg});
 								}
+					      		return;
 							})
-							.catch(function (err) {
-					    		console.error(err);
-					  		});	
-		  				}
-		  			}
-		  		}
-		  	}
-		})
-		  .catch(function (err) {
-		    console.error(err);
-		});
+						  	.catch(function (err) {
+						    	console.error(err);
+						  	});
+			  			}else{
+			  				//add item to list
+			  				console.log('add item to list');
+			  				let tasks = Object.keys(response[givenName][listName]);
+			  				let count = tasks.length;
+			  				let alreadyPresent = false;
+			  				tasks.forEach(function(task){
+								let value = response[givenName][listName][task]['task'];		
+								if(!value){
+									console.log('Empty List');
+									count = 0;
+								}
+								if(value===listItem){
+									alreadyPresent = true;
+								}
+							});
+			  				if(alreadyPresent){
+			  					app.ask({speech: addItemToListError,
+				      			displayText: addItemToListError});
+				      			console.log('value===listItem');
+				      			return;
+			  				}else{
+			  					let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'/'+ count.toString() +'.json';
+								console.log('PUT URL: '+putUri);
+					  			const putOptions ={
+						  			method: 'PUT',
+						  			uri: putUri,
+						  			json: {
+		            						"recurring" : recurringValue,
+		            						"task" : listItem
+		        						  }
+					  			}
+					  			noderequest(putOptions)  
+							  	.then(function (response) {
+							  		if(isGuidedTour){
+										app.ask({speech: itemAddedMsgGuided, displayText: itemAddedMsgGuided});
+									}else{
+										app.ask({speech: itemAddedMsg, displayText: itemAddedMsg});
+									}
+								})
+								.catch(function (err) {
+						    		console.error(err);
+						  		});	
+			  				}
+			  			}
+			  		}
+			  	}
+			})
+			  .catch(function (err) {
+			    console.error(err);
+			});
 
-		return; 
+			return;
+		} 
 	}
 
 	function readListsForOwner (app) {
-		console.log('inside addItemToList and personId is: '+ app.data.personId);
-		let userId = app.data.personId;
-		let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
-		let getUri = DATABASE_URL + userId + '/' + givenName + '.json';
-		const getOptions = {  
-		  method: 'GET',
-		  uri: getUri,
-		  json: true
+
+		if(!app.data.personId){
+			noderequest(googleProfileRequestOptions)
+		    .then(function (profileResponse) {
+		        if (profileResponse) {
+		        	const personId = profileResponse.resourceName.split('/')[1];
+		            console.log('person_id: '+personId);
+		            app.data.personId = personId;
+		            subReadListforOwner();
+		            }
+		    })
+		    .catch(function (err) {
+		        console.error(err);
+		    });
+		}else{
+			subReadListforOwner();
 		}
-		noderequest(getOptions)  
-	  	.then(function (response) {
-	  	
-	  	//If there are no lists for the user
-		 if(response == null){
-		 	app.ask({speech: 'There are currently no lists for '+givenName,
-			      	displayText: 'There are currently no lists for '+toTitleCase(givenName)});
-			return;
-		 }else{
-		 	let lists = Object.keys(response);
-		  	let listArray = [];
 
-		    let listString = "";
-		    let listSpeech = SSML_SPEAK_START + 'Alright! here are the lists for ' + givenName + '<break time="0.5s" />';
+		function subReadListforOwner(){
+			console.log('inside addItemToList and personId is: '+ app.data.personId);
+			let userId = app.data.personId;
+			let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
+			let getUri = DATABASE_URL + userId + '/' + givenName + '.json';
+			const getOptions = {  
+			  method: 'GET',
+			  uri: getUri,
+			  json: true
+			}
+			noderequest(getOptions)  
+		  	.then(function (response) {
+		  	
+		  	//If there are no lists for the user
+			 if(response == null){
+			 	app.ask({speech: 'There are currently no lists for '+givenName,
+				      	displayText: 'There are currently no lists for '+toTitleCase(givenName)});
+				return;
+			 }else{
+			 	let lists = Object.keys(response);
+			  	let listArray = [];
 
-		    lists.forEach(function(list){
-				listString = listString + list + '  \n';
-				listSpeech = listSpeech + list + '<break time="0.5s" />';
-			});
-		    
-			listSpeech = listSpeech + SSML_SPEAK_END;
-			console.log('ListString '+listString);
-		    app.ask(app.buildRichResponse()
-		      .addSimpleResponse({ speech: listSpeech,
-	        displayText: 'Alright! here are the lists for ' + toTitleCase(givenName) })
-		      .addBasicCard(app.buildBasicCard(listString) // Note the two spaces before '\n' required for a
-		                            // line break to be rendered in the card
-		      .setTitle('Lists for '+toTitleCase(givenName)))
-		    );
-		    return;
-	  		}
-		 })
-	  	.catch(function (err) {
-	    	console.error(err);
-	  	});
+			    let listString = "";
+			    let listSpeech = SSML_SPEAK_START + 'Alright! here are the lists for ' + givenName + '<break time="0.5s" />';
+
+			    lists.forEach(function(list){
+					listString = listString + list + '  \n';
+					listSpeech = listSpeech + list + '<break time="0.5s" />';
+				});
+			    
+				listSpeech = listSpeech + SSML_SPEAK_END;
+				console.log('ListString '+listString);
+			    app.ask(app.buildRichResponse()
+			      .addSimpleResponse({ speech: listSpeech,
+		        displayText: 'Alright! here are the lists for ' + toTitleCase(givenName) })
+			      .addBasicCard(app.buildBasicCard(listString) // Note the two spaces before '\n' required for a
+			                            // line break to be rendered in the card
+			      .setTitle('Lists for '+toTitleCase(givenName)))
+			    );
+			    return;
+		  		}
+			 })
+		  	.catch(function (err) {
+		    	console.error(err);
+		  	});
+		}
 
 	}
 
 	function stopNotification(app){
-		//let userId = app.getUser().userId;
-		let userId = app.data.personId;
-		let uri = DATABASE_URL + 'profiles/' + userId +'/notification.json';
-		
-		let options ={
-  			method: 'PUT',
-  			uri: uri,
-  			json: "no"
-  		}
-  		noderequest(options)  
-		.then(function (response) {
-			let successMsg = 'Okay! You have opted out of notifications.';
-			app.ask({speech: successMsg, displayText: successMsg});
-		})
-		.catch(function (err) {
-			console.error(err);
-		});
 
-		return;
+		if(!app.data.personId){
+			noderequest(googleProfileRequestOptions)
+		    .then(function (profileResponse) {
+		        if (profileResponse) {
+		        	const personId = profileResponse.resourceName.split('/')[1];
+		            console.log('person_id: '+personId);
+		            app.data.personId = personId;
+		            subStopNotification();
+		            }
+		    })
+		    .catch(function (err) {
+		        console.error(err);
+		    });
+		}else{
+			subStopNotification();
+		}
+		function subStopNotification(){
+			let userId = app.data.personId;
+			let uri = DATABASE_URL + 'profiles/' + userId +'/notification.json';
+			
+			let options ={
+	  			method: 'PUT',
+	  			uri: uri,
+	  			json: "no"
+	  		}
+	  		noderequest(options)  
+			.then(function (response) {
+				let successMsg = 'Okay! You have opted out of notifications.';
+				app.ask({speech: successMsg, displayText: successMsg});
+			})
+			.catch(function (err) {
+				console.error(err);
+			});
+
+			return;
+		}
 	}
 
   	// Greet the user and direct them to next turn
