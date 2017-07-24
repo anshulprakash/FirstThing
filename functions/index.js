@@ -59,6 +59,18 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		    json: true
 	};
 
+	function helpUser (app){
+		
+		let helpString = 'OK Google, ask FirstThing to start a list.  \nAdd \'pick up dry cleaning\' to my work list.  \nWhat\'s on my work list?  \nWhat lists do I have?  \nCreate a new list for Preston called home.  \nAdd \'make bed\' to Preston\'s home list as a daily task.  \nWhat\'s on Preston\'s home list?  \nStop text notifications.' ;
+	    let helpSpeech = SSML_SPEAK_START + 'To use this skill, you can say things like:'+ '<break time="0.5s" />' +'OK Google, ask FirstThing to start a list. Add \'pick up dry cleaning\' to my work list. What\'s on my work list? What lists do I have? Create a new list for Preston called home. Add \'make bed\' to Preston\'s home list as a daily task. What\'s on Preston\'s home list? Or, stop text notifications.'+ SSML_SPEAK_END;
+
+	    app.ask(app.buildRichResponse()
+	       .addSimpleResponse({ speech: helpSpeech, displayText: 'To use this skill, you can say things like:'})
+	       .addBasicCard(app.buildBasicCard(helpString))
+	    );
+	}
+
+
 	function welcome (app) {
 		console.log('inside welcome');
 		noderequest(googleProfileRequestOptions)
@@ -224,7 +236,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				});
 				
 			    let taskListString = "";
-			    let taskListSpeech = SSML_SPEAK_START + 'Alright! here are the tasks for '+givenName+ '<break time="0.5s" />';
+			    let taskListSpeech = SSML_SPEAK_START + 'Alright! here are the tasks for '+givenName+'\'s '+listName+' list'+ '<break time="0.5s" />';
 
 			    taskArray.forEach(function(task){
 					taskListString = taskListString + task + '  \n';
@@ -233,9 +245,9 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				taskListSpeech = taskListSpeech + SSML_SPEAK_END;
 				console.log('debugggg '+taskListString);
 			    app.ask(app.buildRichResponse()
-			       .addSimpleResponse({ speech: taskListSpeech, displayText: 'Alright! here are the tasks for '+toTitleCase(givenName) })
+			       .addSimpleResponse({ speech: taskListSpeech, displayText: 'Alright! here are the tasks for '+toTitleCase(givenName) +'\'s '+listName+' list'})
 			       .addBasicCard(app.buildBasicCard(taskListString) 
-			       .setTitle('List of tasks for '+toTitleCase(givenName)))
+			       .setTitle(toTitleCase(givenName)+'\'s '+listName+' list'))
 			    );
 			    
 			    let profileUri = DATABASE_URL + 'profiles/' + userId +'.json';
@@ -433,7 +445,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			console.log('recurring_value= '+recurringValue);
 
 			let itemAddedMsg = recurringValue == "no" ? 'Got it. \''+listItem+ '\' added to '+toTitleCase(givenName)+'\'s '+listName+' list' : 'Got it. \''+listItem+'\' will repeat '+recurringValue+' for '+toTitleCase(givenName);
-			let itemAddedMsgGuided = 'Perfect! To read this list you can say \'OK Google, ask FirstThing what\'s on '+ toTitleCase(givenName)+ '\'s '+listName+' list?';
+			let itemAddedMsgGuided = 'Perfect! To read this list you can say \'What\'s on '+ toTitleCase(givenName)+ '\'s '+listName+' list?';
 			let addItemToListError = '\''+listItem +'\''+ ' is already there in '+toTitleCase(givenName)+'\'s '+ listName +' list';
 			
 			let isGuidedTour = app.getContext(GUIDED_TOUR) ? true : false;
@@ -720,7 +732,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	actionMap.set(ADD_PHONENUMBER,addPhoneNumber);
 	actionMap.set(INPUT_WELCOME, welcome);
 	actionMap.set(STOP_NOTIFICATION, stopNotification);
-
+	actionMap.set('help.user',helpUser)
 	app.handleRequest(actionMap);
 
 });
