@@ -203,7 +203,14 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			  .then(function (response) { 
 			  	console.log('response from database: '+ JSON.stringify(response));
 
-			  	let people = Object.keys(response);
+			  	if(response==null){
+			  		app.ask({speech: 'Sorry! There is no list for '+ givenName,
+		      			displayText: 'Sorry! There is no list for '+ toTitleCase(givenName)});
+
+			  		return;
+			  	}else{
+			  		var people = Object.keys(response);
+			  	}
 
 			  	if(people.indexOf(givenName) == -1){
 			  		//givenName does not have any list
