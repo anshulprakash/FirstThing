@@ -8,6 +8,7 @@ const twilio = require('twilio');
 const validator = require('validator');
 
 const DATABASE_URL = "https://vml-mobi-first-thing.firebaseio.com/";
+const DATABASE_ACCESS_TOKEN = "?access_token=ya29.EluUBN6MCL2XgwYJO_XMa1mP8wJnadpFslQ7EU3pruaMcxUKQ6t5qUbLWevPoYJ9PWUsPtRfdhYjXaBnCWccLR08cxjLpXpvXVYpy5vcMzauZ8nB7wiUInN6bBiz";
 
 const SSML_SPEAK_START = '<speak>';
 const SSML_SPEAK_END = '</speak>';
@@ -81,7 +82,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	            app.data.personId = personId;
 
 	            let userId = app.data.personId;
-				let profileUri = DATABASE_URL + 'profiles/' + userId +'.json';
+				let profileUri = DATABASE_URL + 'profiles/' + userId +'.json' + DATABASE_ACCESS_TOKEN;
 				let message = "Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start?";
 				let profileOptions ={
 		  			method: 'GET',
@@ -135,10 +136,10 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		function subAddPhoneNumber(){
 			let userId = app.data.personId;
 			let phoneNumber = app.getArgument(PHONE_NUMBER);
-			let postUri = DATABASE_URL + 'profiles/' + userId +'.json';
+			let postUri = DATABASE_URL + 'profiles/' + userId +'.json'+ DATABASE_ACCESS_TOKEN;
 			let isWelcomeFlow = app.getContext('add-phone-number') == null ? false : true;
-			let successMsg = 'Got it. I\'ll send you a text when your users access their lists. You can cancel this at any time by telling me to stop notifications.';
-
+			let successMsg = 'Got it. I\'ll send you a text to '+phoneNumber+' when your users access their lists. You can cancel this at any time by telling me to stop notifications.';
+			let successMsgSpeech = SSML_SPEAK_START + 'Got it. I\'ll send you a text to <say-as interpret-as="characters">'+phoneNumber+'</say-as> when your users access their lists. You can cancel this at any time by telling me to stop notifications.' + SSML_SPEAK_END;
 			if(isWelcomeFlow){
 				successMsg = successMsg + ' Ready to start a guided tour?';
 			}
@@ -152,7 +153,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	  		}
 	  		noderequest(postOptions)  
 			.then(function (response) {
-				app.ask({speech: successMsg,
+				app.ask({speech: successMsgSpeech,
 					     displayText: successMsg});
 			})
 			.catch(function (err) {
@@ -193,7 +194,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			console.log(givenName);
 			console.log(listName);
 
-			let getUri = DATABASE_URL + userId + '.json';
+			let getUri = DATABASE_URL + userId + '.json'+ DATABASE_ACCESS_TOKEN;
 			let options = {  
 			  method: 'GET',
 			  uri: getUri,
@@ -257,7 +258,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			       .setTitle(toTitleCase(givenName)+'\'s '+listName+' list'))
 			    );
 			    
-			    let profileUri = DATABASE_URL + 'profiles/' + userId +'.json';
+			    let profileUri = DATABASE_URL + 'profiles/' + userId +'.json'+ DATABASE_ACCESS_TOKEN;
 			
 				let profileOptions ={
 		  			method: 'GET',
@@ -323,12 +324,12 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 			let listName = app.getArgument(LIST_NAME).toLowerCase();
 
-			let createListSuccessTxt = 'List created by the name \''+listName+'\' for '+toTitleCase(givenName);
-			let createListSuccessSpeech = 'List created by the name '+listName+' for '+givenName;
+			let createListSuccessTxt = 'Absolutely! The list \''+listName+'\' has been created for '+toTitleCase(givenName);
+			let createListSuccessSpeech = 'Absolutely! The list '+listName+' has been created for '+givenName;
 			let errorMsg = 'There is already a list by the name \''+listName+'\' for '+toTitleCase(givenName);
 			let errorSpeech = 'There is already a list by the name '+listName+' for '+givenName;
 
-			let getUri = DATABASE_URL + userId + '.json';
+			let getUri = DATABASE_URL + userId + '.json'+ DATABASE_ACCESS_TOKEN;
 			const getOptions = {  
 			  method: 'GET',
 			  uri: getUri,
@@ -364,7 +365,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			  		//givenName does not exist under the userId
 			  		if(people.indexOf(givenName) == -1){
 			  			console.log('givenName does not have any list');
-			  			let putUri = DATABASE_URL + userId + '/' + givenName +'.json';
+			  			let putUri = DATABASE_URL + userId + '/' + givenName +'.json'+ DATABASE_ACCESS_TOKEN;
 			  			const putOptions ={
 			  			method: 'PUT',
 			  			uri: putUri,
@@ -392,7 +393,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				      		return;
 					  	}else{
 					  		console.log('Creating list for' + givenName);
-					  		let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'.json';
+					  		let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'.json'+ DATABASE_ACCESS_TOKEN;
 				  			const putOptions ={
 					  			method: 'PUT',
 					  			uri: putUri,
@@ -452,7 +453,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			console.log('recurring_value= '+recurringValue);
 
 			let itemAddedMsg = recurringValue == "no" ? 'Got it. \''+listItem+ '\' added to '+toTitleCase(givenName)+'\'s '+listName+' list' : 'Got it. \''+listItem+'\' will repeat '+recurringValue+' for '+toTitleCase(givenName);
-			let itemAddedMsgGuided = 'Perfect! To read this list you can say \'What\'s on '+ toTitleCase(givenName)+ '\'s '+listName+' list?';
+			let itemAddedMsgGuided = 'Perfect! To read this list you can say \'What\'s on '+ toTitleCase(givenName)+ '\'s '+listName+' list?\'';
 			let addItemToListError = '\''+listItem +'\''+ ' is already there in '+toTitleCase(givenName)+'\'s '+ listName +' list';
 			
 			let isGuidedTour = app.getContext(GUIDED_TOUR) ? true : false;
@@ -462,7 +463,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 
 			
 
-			let getUri = DATABASE_URL + userId + '.json';
+			let getUri = DATABASE_URL + userId + '.json'+ DATABASE_ACCESS_TOKEN;
 			const getOptions = {  
 			  method: 'GET',
 			  uri: getUri,
@@ -505,7 +506,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			  		if(people.indexOf(givenName) == -1){
 			  			console.log('If the givenName is not there under the userId');
 			  			//create a list with listName for givenName and add listItem to it
-			  			let putUri = DATABASE_URL + userId + '/' + givenName +'.json';
+			  			let putUri = DATABASE_URL + userId + '/' + givenName +'.json'+ DATABASE_ACCESS_TOKEN;
 			  			const putOptions ={
 			  			method: 'PUT',
 			  			uri: putUri,
@@ -534,7 +535,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			  			if(lists.indexOf(listName) == -1){
 			  				console.log('if there is no list by the name of listName');
 			  				//add listName under givenName and add listItem to it
-			  				let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'.json';
+			  				let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'.json'+ DATABASE_ACCESS_TOKEN;
 				  			const putOptions ={
 					  			method: 'PUT',
 					  			uri: putUri,
@@ -577,7 +578,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 				      			console.log('value===listItem');
 				      			return;
 			  				}else{
-			  					let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'/'+ count.toString() +'.json';
+			  					let putUri = DATABASE_URL + userId + '/' + givenName + '/' + listName +'/'+ count.toString() +'.json'+ DATABASE_ACCESS_TOKEN;
 								console.log('PUT URL: '+putUri);
 					  			const putOptions ={
 						  			method: 'PUT',
@@ -634,7 +635,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			console.log('inside addItemToList and personId is: '+ app.data.personId);
 			let userId = app.data.personId;
 			let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
-			let getUri = DATABASE_URL + userId + '/' + givenName + '.json';
+			let getUri = DATABASE_URL + userId + '/' + givenName + '.json'+ DATABASE_ACCESS_TOKEN;
 			const getOptions = {  
 			  method: 'GET',
 			  uri: getUri,
@@ -699,7 +700,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		}
 		function subStopNotification(){
 			let userId = app.data.personId;
-			let uri = DATABASE_URL + 'profiles/' + userId +'/notification.json';
+			let uri = DATABASE_URL + 'profiles/' + userId +'/notification.json'+ DATABASE_ACCESS_TOKEN;
 			
 			let options ={
 	  			method: 'PUT',
