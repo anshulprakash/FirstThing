@@ -9,7 +9,7 @@ const twilio = require('twilio');
 const validator = require('validator');
 
 const DATABASE_URL = "https://vml-mobi-first-thing.firebaseio.com/";
-const DATABASE_ACCESS_TOKEN = "?access_token=ya29.El-VBKt1VqP1HM2ChQxReNqTQfFg2jHObbQUXozcI6sZ2o1xJVTvPDc8heczfsttv_lgNl_qGOp2agGrIakP0CCWyoLLAiOsDzLTom6t76SLowQtQii239ZsbuXHPD0AXA";
+const DATABASE_ACCESS_TOKEN = "?access_token=ya29.El-VBGMrKlyWxZQssFwnAKko0A28TFs83nBA2yUdE3gpsujd_DpubPaLrDm1q2CMhUuvfFXpUNhkNREO7zyK-ijDczlEhYspASLCEuwmDma5cLDerEhgNKCQPnemz7XzrA";
 
 const SSML_SPEAK_START = '<speak>';
 const SSML_SPEAK_END = '</speak>';
@@ -732,6 +732,10 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	    }
 	}
 
+	function exit (app) {
+	    app.tell('Thank you for using FirstThing.');
+	}
+
 	let actionMap = new Map();
 	actionMap.set(READ_LIST, readList);
 	actionMap.set(CREATE_LIST, createList);
@@ -742,6 +746,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	actionMap.set(INPUT_WELCOME, welcome);
 	actionMap.set(STOP_NOTIFICATION, stopNotification);
 	actionMap.set('help.user',helpUser)
+	actionMap.set('exit',exit)
 	app.handleRequest(actionMap);
 
 });
