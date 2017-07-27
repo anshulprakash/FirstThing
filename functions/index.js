@@ -506,7 +506,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			addItemtoListFetchProfile();
 		}
 		
-		function addItemtoListFetchProfile(){
+		function addItemtoListFetchProfile (){
 			if(!app.data.personId){
 				noderequest(googleProfileRequestOptions)
 			    .then(function (profileResponse) {
@@ -526,7 +526,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 		}
 		
 
-		function subAddItemToList(){
+		function subAddItemToList () {
 			console.log('inside addItemToList and personId is: '+ app.data.personId);
 			let DATABASE_ACCESS_TOKEN = app.data.accessToken;
 			let userId = app.data.personId;
@@ -836,6 +836,87 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			return;
 		}
 	}
+	//lists all users for a google account
+	function listUsers(){
+		if(!app.data.accessToken){
+			admin.credential.cert(serviceAccount).getAccessToken().then(function(response){
+
+				app.data.accessToken = "?access_token="+response.access_token;
+				console.log('DATABASE_ACCESS_TOKEN: '+app.data.accessToken);
+				listUsersFetchProfile();
+			}).catch(function (err) {
+				       console.error(err);
+			});
+		}else{
+			listUsersFetchProfile();
+		}
+
+		function listUsersFetchProfile(){
+			if(!app.data.personId){
+				noderequest(googleProfileRequestOptions)
+			    .then(function (profileResponse) {
+			        if (profileResponse) {
+			        	const personId = profileResponse.resourceName.split('/')[1];
+			            console.log('person_id: '+personId);
+			            app.data.personId = personId;
+			            sublistUsers();
+			            }
+			    })
+			    .catch(function (err) {
+			        console.error(err);
+			    });
+			}else{
+				sublistUsers();
+			}
+
+		}
+		
+		function sublistUsers(){
+			console.log('inside list users and personId is: '+ app.data.personId);
+			let DATABASE_ACCESS_TOKEN = app.data.accessToken;
+			let userId = app.data.personId;
+			let getUri = DATABASE_URL + userId + '.json'+ DATABASE_ACCESS_TOKEN;
+			const getOptions = {  
+			  method: 'GET',
+			  uri: getUri,
+			  json: true
+			}
+			noderequest(getOptions)  
+		  	.then(function (response) {
+		  	
+		  	//If there are no lists for the user
+			 if(response == null){
+			 	app.ask({speech: 'There are currently no users.',
+				      	displayText: 'There are currently no users.'});
+				return;
+			 }else{
+			 	let users = Object.keys(response);
+			  	let usersArray = [];
+
+			    let usersString = "";
+			    let usersSpeech = SSML_SPEAK_START + 'Alright! here are the name of users for your account' + '<break time="0.5s" />';
+
+			    users.forEach(function(user){
+					usersString = usersString + user + '  \n';
+					usersSpeech = usersSpeech + user + '<break time="0.5s" />';
+				});
+			    
+				usersSpeech = usersSpeech + SSML_SPEAK_END;
+				console.log('usersString '+usersString);
+			    app.ask(app.buildRichResponse()
+			      .addSimpleResponse({ speech: usersSpeech,
+		        displayText: 'Alright! here are the name of users for your account'})
+			      .addBasicCard(app.buildBasicCard(usersString)
+			      .setTitle('Name of users for your account: '))
+			    );
+			    return;
+		  		}
+			 })
+		  	.catch(function (err) {
+		    	console.error(err);
+		  	});
+		}
+	}
 
   	// Greet the user and direct them to next turn
 	function unhandledDeepLinks (app) {
@@ -861,8 +942,9 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	actionMap.set(ADD_PHONENUMBER,addPhoneNumber);
 	actionMap.set(INPUT_WELCOME, welcome);
 	actionMap.set(STOP_NOTIFICATION, stopNotification);
-	actionMap.set('help.user',helpUser)
-	actionMap.set('exit',exit)
+	actionMap.set('help.user',helpUser);
+	actionMap.set('exit',exit);
+	actionMap.set('list.users',listUsers);
 	app.handleRequest(actionMap);
 
 });
