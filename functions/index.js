@@ -4,11 +4,12 @@ process.env.DEBUG = 'actions-on-google:*';
 const App = require('actions-on-google').ApiAiApp;
 const functions = require('firebase-functions');
 const noderequest = require('request-promise');
+
 const twilio = require('twilio');
 const validator = require('validator');
 
 const DATABASE_URL = "https://vml-mobi-first-thing.firebaseio.com/";
-const DATABASE_ACCESS_TOKEN = "?access_token=ya29.EluUBN6MCL2XgwYJO_XMa1mP8wJnadpFslQ7EU3pruaMcxUKQ6t5qUbLWevPoYJ9PWUsPtRfdhYjXaBnCWccLR08cxjLpXpvXVYpy5vcMzauZ8nB7wiUInN6bBiz";
+const DATABASE_ACCESS_TOKEN = "?access_token=ya29.El-VBKt1VqP1HM2ChQxReNqTQfFg2jHObbQUXozcI6sZ2o1xJVTvPDc8heczfsttv_lgNl_qGOp2agGrIakP0CCWyoLLAiOsDzLTom6t76SLowQtQii239ZsbuXHPD0AXA";
 
 const SSML_SPEAK_START = '<speak>';
 const SSML_SPEAK_END = '</speak>';
@@ -139,7 +140,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			let postUri = DATABASE_URL + 'profiles/' + userId +'.json'+ DATABASE_ACCESS_TOKEN;
 			let isWelcomeFlow = app.getContext('add-phone-number') == null ? false : true;
 			let successMsg = 'Got it. I\'ll send you a text to '+phoneNumber+' when your users access their lists. You can cancel this at any time by telling me to stop notifications.';
-			let successMsgSpeech = SSML_SPEAK_START + 'Got it. I\'ll send you a text to <say-as interpret-as="characters">'+phoneNumber+'</say-as> when your users access their lists. You can cancel this at any time by telling me to stop notifications.' + SSML_SPEAK_END;
+			let successMsgSpeech = 'Got it. I\'ll send you a text to '+phoneNumber.split("").join(" ")+' when your users access their lists. You can cancel this at any time by telling me to stop notifications.';
 			if(isWelcomeFlow){
 				successMsg = successMsg + ' Ready to start a guided tour?';
 			}
@@ -153,8 +154,8 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	  		}
 	  		noderequest(postOptions)  
 			.then(function (response) {
-				app.ask({speech: successMsgSpeech,
-					     displayText: successMsg});
+				app.ask(app.buildRichResponse()
+	       					.addSimpleResponse({speech: successMsgSpeech, displayText: successMsg}))
 			})
 			.catch(function (err) {
 				console.error(err);
