@@ -532,7 +532,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			let userId = app.data.personId;
 			let givenName = app.getArgument(GIVEN_NAME).toLowerCase();
 			let listName = app.getArgument(LIST_NAME).toLowerCase();
-			let listItem = app.getArgument(LIST_ITEM).toLowerCase();
+			let listItem = app.getArgument(LIST_ITEM).toLowerCase().replace(/['"]/g, '');
 			let recurringValue = app.getArgument(RECURRING_VALUE);
 
 			recurringValue = recurringValue ? recurringValue.toLowerCase() : "no";
