@@ -74,6 +74,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-el5dl%40vml-mobi-first-thing.iam.gserviceaccount.com"
 	};
 
+	//Function for Help intent
 	function helpUser (app){
 		
 		let helpString = 'OK Google, ask FirstThing to start a list.  \nAdd \'pick up dry cleaning\' to my work list.  \nWhat\'s on my work list?  \nWhat lists do I have?  \nCreate a new list for Preston called home.  \nAdd \'make bed\' to Preston\'s home list as a daily task.  \nWhat\'s on Preston\'s home list?  \nStop text notifications.' ;
@@ -85,18 +86,21 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 	    );
 	}
 
-
+	//Function for Welcome intent
 	function welcome (app) {
 		console.log('inside welcome');
 
+		//get access token for firebase
 		admin.credential.cert(serviceAccount).getAccessToken().then(function(response){
 			let DATABASE_ACCESS_TOKEN = "?access_token="+response.access_token;
 			console.log('DATABASE_ACCESS_TOKEN: '+DATABASE_ACCESS_TOKEN);
 			app.data.accessToken = DATABASE_ACCESS_TOKEN;
 
+			//get users profile from People's API
 			noderequest(googleProfileRequestOptions)
 		    .then(function (profileResponse) {
 		        if (profileResponse) {
+		        	//get the person ID from the resource name
 		            const personId = profileResponse.resourceName.split('/')[1];
 		            console.log('person_id: '+personId);
 		            app.data.personId = personId;
@@ -109,13 +113,14 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 			  			uri: profileUri,
 			  			json: true
 			  		}
+			  		// GET request to see if the data for the user is present in firebase or not
 			  		noderequest(profileOptions)
 					.then(function (response) {
 						console.log('Response: '+response);
+						//if data about user account is present in firebase
 						if(response!=null){
 							console.log('adding context');
 							app.setContext('add-phone-number',0);
-							//app.setContext('defaultwelcomeintent-followup',0);
 							app.setContext('phone-number-added',1);
 							message = "Welcome to FirstThing. You can create to-do lists for yourself or any person, add tasks, and read them. Ready to start a guided tour?";
 						}
@@ -136,6 +141,7 @@ exports.firstThing = functions.https.onRequest((request, response) => {
 
 		return;
 	}
+
 	//function to start notifications or to add phone number
 	function addPhoneNumber (app) {
 
